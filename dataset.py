@@ -8,11 +8,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Define a mapping from nucleotide to one-hot encoding
 nucleotide_to_onehot = {
-    'A': [1, 0, 0, 0, 0],
-    'C': [0, 1, 0, 0, 0],
-    'G': [0, 0, 1, 0, 0],
-    'T': [0, 0, 0, 1, 0],
-    'N': [0, 0, 0, 0, 1] # TODO: why there is an N ? need to check. if its a noise in our data, need to remove this entry and return to 4th dimentional one-hot.
+    'A': [1, 0, 0, 0],
+    'C': [0, 1, 0, 0],
+    'G': [0, 0, 1, 0],
+    'T': [0, 0, 0, 1],
+    'N': [0.25, 0.25, 0.25, 0.25]
 }
 
 def encode_sequence(sequence):
