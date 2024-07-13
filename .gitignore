@@ -2,3 +2,4 @@ data/
 tmp/
 .vscode/
 __pycache__/
+.idea/

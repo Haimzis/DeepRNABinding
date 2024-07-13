@@ -1,8 +1,10 @@
+import copy
 import os
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
+from sklearn.model_selection import KFold
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -47,6 +49,7 @@ class RNASequenceDataset(Dataset):
         self.train = train
         self.intensities = self.load_intensities()
         self.data = self.load_data()
+        self.process_data()
         
     def load_sequences(self, file_path):
         """Loads all possible RNA sequences from a file.
@@ -89,7 +92,13 @@ class RNASequenceDataset(Dataset):
                 df['occurrences'] = df['occurrences'].astype(np.uint8)
                 df['label'] = j
                 df_list.append(df)
-                
+
+        if not df_list:
+            raise FileNotFoundError(f"No htr-selex files found for RBP{self.i}")
+
+        if len(df_list) == 1:
+            data = df_list[0].to_records(index=False)
+        else:
             combined_df = pd.concat(df_list, ignore_index=True)
             
             combined_df['sequence'] = combined_df['sequence'].astype(str)
@@ -98,6 +107,63 @@ class RNASequenceDataset(Dataset):
             data = combined_df.to_records(index=False)
         
         return data
+
+    def process_data(self):
+        """Processes the loaded data to get maximum labels for each sequence."""
+        df = pd.DataFrame(self.data)
+        max_labels = df.groupby('sequence').agg({
+            'occurrences': 'sum',
+            'label': 'max'
+        }).reset_index()
+        self.data = max_labels.to_records(index=False)
+
+    def create_k_fold_loaders(self, kfold, iteration, batch_size=32, trim=False):
+        """Creates train and validation data loaders for a specific k-fold iteration.
+
+        Args:
+            kfold (int): The number of folds for k-fold cross-validation.
+            iteration (int): The current fold iteration (0-based).
+            batch_size (int, optional): The batch size for the data loaders. Defaults to 32.
+            trim (bool, optional): Whether to trim the data for faster debugging. Defaults to False.
+
+        Returns:
+            DataLoader: The training data loader.
+            DataLoader: The validation data loader.
+        """
+        dataset_size = len(self.data)
+        indices = list(range(dataset_size))
+
+        if trim:
+            indices = indices[:1000]
+
+        kf = KFold(n_splits=kfold, shuffle=True, random_state=42)
+        splits = list(kf.split(indices))
+
+        if iteration < 0 or iteration >= kfold:
+            raise ValueError(f"Invalid iteration. Must be between 0 and {kfold - 1}")
+
+        train_idx, val_idx = splits[iteration]
+
+        train_subset = Subset(self, train_idx)
+        val_subset = Subset(self, val_idx)
+
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+
+        return train_loader, val_loader
+
+    def is_same_length(self):
+        """Checks if all sequences in self.data have the same length.
+        """
+        return len(set(len(record['sequence']) for record in self.data)) == 1
+
+    def get_sequence_length(self):
+        """Returns the length of the RNA sequences.
+
+        Returns:
+            int: The length of the RNA sequences.
+        """
+        return len(self.data[0]['sequence'])
 
     def get_sequences(self):
         """Returns the list of RNA sequences.
@@ -148,10 +214,13 @@ if __name__ == '__main__':
     i = 1  # Set i to 1 for now
 
     train_dataset = RNASequenceDataset(sequences_file, intensities_dir, htr_selex_dir, i, train=True)
+
     test_dataset = RNASequenceDataset(sequences_file, intensities_dir, htr_selex_dir, i, train=False)
 
+    train_loader, val_loader = train_dataset.create_k_fold_loaders(kfold=5, iteration=0, batch_size=32)
+
     # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    #train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
     
     # Example usage of new methods
