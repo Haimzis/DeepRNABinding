@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader, Subset, TensorDataset, DataLoader
 from sklearn.model_selection import KFold
 
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Define a mapping from nucleotide to one-hot encoding
@@ -118,7 +119,7 @@ class RNASequenceDataset(Dataset):
         }).reset_index()
         self.data = max_labels.to_records(index=False)
 
-    def create_k_fold_loaders(self, kfold, iteration, batch_size=32, trim=False, negative_examples=10000):
+    def create_k_fold_loaders(self, kfold, iteration, batch_size=32, trim=False, negative_examples=10000, num_workers=0):
         """Creates train and validation data loaders for a specific k-fold iteration.
 
         Args:
@@ -154,8 +155,8 @@ class RNASequenceDataset(Dataset):
         train_subset = Subset(self, train_idx)
         val_subset = Subset(self, val_idx)
 
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
         return train_loader, val_loader
 
