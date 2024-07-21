@@ -15,7 +15,7 @@ def parse_args():
     parser.add_argument('--load_model_file', type=str, default='outputs/models/Deep_SELEX/best_model.ckpt', help='File to load the model.')
     parser.add_argument('--batch_size', type=int, default=1024, help='Batch size for training.')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs for training.')
-    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate for training.')
+    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate for training.')
     parser.add_argument('--early_stopping', type=int, default=10, help='Number of epochs for early stopping.')
     parser.add_argument('--seed', type=int, default=24, help='Seed for random number generator.')
     parser.add_argument('--kfold', type=int, default=5, help='Number of folds for k-fold cross-validation.')

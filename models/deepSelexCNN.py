@@ -66,8 +66,10 @@ class DeepSELEX(pl.LightningModule):
         Configure optimizers and learning rate scheduler.
         """
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
-        return [optimizer], [scheduler]
+        # TODO: No need for scheduler when using Adam.
+        # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
+        # return [optimizer], [scheduler]
+        return optimizer 
 
     def training_step(self, batch, batch_idx):
         """
