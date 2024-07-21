@@ -32,6 +32,8 @@ Our goal is to predict the intensity levels for "RBP39.txt",..., "RBP76.txt" fil
 """
 import argparse
 import logging as log
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -119,10 +121,10 @@ def main(parsed_args):
 
     # Train and predict the model on RBP_i
     if parsed_args.train:
-        train_dataset = dataset.RNASequenceDataset(parsed_args.sequences_file, parsed_args.intensities_dir, parsed_args.htr_selex_dir, 1, train=True)
+        train_dataset = dataset.RNASequenceDataset(parsed_args.sequences_file, parsed_args.intensities_dir, parsed_args.htr_selex_dir, parsed_args.rbp_num, train=True)
         # do cross validation on RBP1
         for i in range(parsed_args.kfold):
-            train_loader, val_loader = train_dataset.create_k_fold_loaders(parsed_args.kfold, i, parsed_args.batch_size, True)
+            train_loader, val_loader = train_dataset.create_k_fold_loaders(parsed_args.kfold, i, parsed_args.batch_size, trim=True, negative_examples=0)
             model = DeepSELEX(train_dataset.get_sequence_length(), 5)
             model.to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=parsed_args.lr)
@@ -132,7 +134,37 @@ def main(parsed_args):
             if torch_trainer.best_val_loss < best_loss:
                 best_loss = torch_trainer.best_val_loss
                 best_model = model
+
         # Save the best model
+        if best_model:
+            torch.save(best_model.state_dict(), parsed_args.save_model_file)
+            log.info(f'Saved the best model to {parsed_args.save_model_file}')
+
+    if parsed_args.predict:
+        # Load the best model if it's not already in memory
+        if not best_model:
+            best_model = DeepSELEX(train_dataset.get_sequence_length(), 5)
+            best_model.load_state_dict(torch.load(parsed_args.load_model_file))
+            best_model.to(device)
+
+    # Create test dataset for RBP_i
+    test_dataset = dataset.RNASequenceDataset(parsed_args.sequences_file, parsed_args.intensities_dir, parsed_args.htr_selex_dir, parsed_args.rbp_num, train=False)
+    test_loader = test_dataset.create_test_loader(parsed_args.batch_size, include_targets=False)
+
+    # Predict the intensity levels
+    if parsed_args.predict:
+        predictions = []
+        for batch in test_loader:
+            batch = batch[0].to(device) # Only the input data is needed [0]
+            outputs = best_model(batch)
+            predictions.append(outputs)
+        predictions = torch.cat(predictions, dim=0)
+        predictions = torch.argmax(predictions, dim=1)
+        utils.save_predictions(predictions, parsed_args.predict_output_dir)
+        log.info(f'Saved the predictions to {parsed_args.predict_output_dir}')
+
+
+
 
 
 def parse_cli():
@@ -140,6 +172,8 @@ def parse_cli():
     Parse the command line arguments.
     """
     parser = argparse.ArgumentParser(description='DeepSELEX model for predicting intensity levels.')
+    parser.add_argument('--rbp_num', type=int, default=1,
+                        help='The number of the RNA binding protein to predict.')
     parser.add_argument('--debug', action='store_true',
                         help='Enable debug mode.')
     parser.add_argument('--train', action='store_true',
@@ -179,6 +213,7 @@ def parse_cli():
 if __name__ == '__main__':
     if utils.is_debugging():
         parsed_args = argparse.Namespace(
+            rbp_num=1,
             debug=True,
             train=True,
             predict=True,

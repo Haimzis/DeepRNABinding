@@ -307,3 +307,17 @@ def save_model(model, filename):
     if not os.path.exists(os.path.dirname(filename)):
         os.makedirs(os.path.dirname(filename))
     torch.save(model.state_dict(), filename)
+
+
+def save_predictions(predictions, predict_output_dir):
+    """
+    @brief: Save the predictions to a file.
+    Args:
+        predictions: A tensor containing the predictions.
+        predict_output_dir: The directory to save the predictions to.
+    """
+    if not os.path.exists(predict_output_dir):
+        os.makedirs(predict_output_dir)
+    with open(os.path.join(predict_output_dir, 'predictions.txt'), 'w') as f:
+        for pred in predictions:
+            f.write(f'{pred}\n')

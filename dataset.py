@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import Dataset, DataLoader, Subset, TensorDataset, DataLoader
 from sklearn.model_selection import KFold
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -14,6 +14,7 @@ nucleotide_to_onehot = {
     'C': [0, 1, 0, 0],
     'G': [0, 0, 1, 0],
     'T': [0, 0, 0, 1],
+    'U': [0, 0, 0, 1],
     'N': [0.25, 0.25, 0.25, 0.25]
 }
 
@@ -117,7 +118,7 @@ class RNASequenceDataset(Dataset):
         }).reset_index()
         self.data = max_labels.to_records(index=False)
 
-    def create_k_fold_loaders(self, kfold, iteration, batch_size=32, trim=False):
+    def create_k_fold_loaders(self, kfold, iteration, batch_size=32, trim=False, negative_examples=10000):
         """Creates train and validation data loaders for a specific k-fold iteration.
 
         Args:
@@ -125,6 +126,7 @@ class RNASequenceDataset(Dataset):
             iteration (int): The current fold iteration (0-based).
             batch_size (int, optional): The batch size for the data loaders. Defaults to 32.
             trim (bool, optional): Whether to trim the data for faster debugging. Defaults to False.
+            negative_examples (int, optional): The number of negative samples to generate. Defaults to 10000.
 
         Returns:
             DataLoader: The training data loader.
@@ -134,7 +136,12 @@ class RNASequenceDataset(Dataset):
         indices = list(range(dataset_size))
 
         if trim:
-            indices = indices[:1000]
+            indices = indices[:100]
+
+        if negative_examples:
+            negative_examples = [{'sequence': ''.join(np.random.choice(['A', 'C', 'G', 'T'], 40)),
+                                  'occurrences': 1, 'label': 0} for _ in range(negative_examples)]
+            self.data.extend(negative_examples)
 
         kf = KFold(n_splits=kfold, shuffle=True, random_state=42)
         splits = list(kf.split(indices))
@@ -151,6 +158,44 @@ class RNASequenceDataset(Dataset):
         val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
         return train_loader, val_loader
+
+    def create_test_loader(self, batch_size=32, include_targets=False):
+        """Creates a test data loader for the dataset.
+
+        Args:
+            batch_size (int, optional): The batch size for the data loader. Defaults to 32.
+            include_targets (bool, optional): Whether to include target labels in the data loader. Defaults to False.
+
+        Returns:
+            DataLoader: The test data loader.
+        """
+        # Create a DataFrame from self.sequences
+        df = pd.DataFrame({'sequence': self.sequences})
+
+        # Encode sequences
+        df['encoded'] = df['sequence'].apply(lambda seq: encode_sequence(seq))
+
+        # Pad sequences to max_length
+        max_length = 41
+        df['padded'] = df['encoded'].apply(
+            lambda seq: seq + [[0.25, 0.25, 0.25, 0.25]] * (max_length - len(seq)) if len(seq) < max_length else seq
+        )
+
+        # Convert encoded sequences to a 3D numpy array
+        encoded_sequences = np.array(df['padded'].tolist())
+
+        # Convert to PyTorch tensors
+        encoded_sequences = torch.tensor(encoded_sequences, dtype=torch.float32)
+
+        # Add intensities if available
+        if self.intensities is not None:
+            intensities = torch.tensor(self.intensities, dtype=torch.float32)
+            dataset = TensorDataset(encoded_sequences, intensities)
+        else:
+            dataset = TensorDataset(encoded_sequences)
+
+        # Create and return the DataLoader
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     def is_same_length(self):
         """Checks if all sequences in self.data have the same length.
