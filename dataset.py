@@ -4,6 +4,8 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader, Subset, TensorDataset
 from sklearn.model_selection import KFold
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -73,10 +75,9 @@ class RNASequenceDataset(Dataset):
             np.ndarray: An array of intensity values or None if not in training mode or file doesn't exist.
         """
         intensities = None
-        if self.train:
-            intensities_file = os.path.join(self.intensities_dir, f'RBP{self.i}.txt')
-            if os.path.exists(intensities_file):
-                intensities = pd.read_csv(intensities_file, header=None).values.flatten()
+        intensities_file = os.path.join(self.intensities_dir, f'RBP{self.i}.txt')
+        if os.path.exists(intensities_file):
+            intensities = pd.read_csv(intensities_file, header=None).values.flatten()
         return intensities
 
     def load_data(self, trim, negative_examples):
@@ -125,12 +126,11 @@ class RNASequenceDataset(Dataset):
         }).reset_index()
         self.data = max_labels.to_records(index=False)
 
-    def create_test_loader(self, batch_size=32, include_targets=False):
+    def create_test_loader(self, batch_size=32):
         """Creates a test data loader for the dataset.
 
         Args:
             batch_size (int, optional): The batch size for the data loader. Defaults to 32.
-            include_targets (bool, optional): Whether to include target labels in the data loader. Defaults to False.
 
         Returns:
             DataLoader: The test data loader.
@@ -145,14 +145,20 @@ class RNASequenceDataset(Dataset):
 
         encoded_sequences = np.array(df['padded'].tolist())
         encoded_sequences = torch.tensor(encoded_sequences, dtype=torch.float32)
-
-        if self.intensities is not None:
-            intensities = torch.tensor(self.intensities, dtype=torch.float32)
-            dataset = TensorDataset(encoded_sequences, intensities)
-        else:
-            dataset = TensorDataset(encoded_sequences)
+        dataset = TensorDataset(encoded_sequences)
 
         return DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    def get_person_correlation(self, predictions):
+        """Calculates the Pearson correlation between the predictions and intensities.
+
+        Args:
+            predictions (np.ndarray): The predictions from the model.
+
+        Returns:
+            float: The Pearson correlation between the predictions and intensities.
+        """
+        return np.corrcoef(predictions, self.intensities)[0, 1]
 
     def is_same_length(self):
         """Checks if all sequences in self.data have the same length."""
@@ -204,7 +210,45 @@ class RNASequenceDataset(Dataset):
         occurrences = torch.tensor(record['occurrences'], dtype=torch.int64, device=device)
         label = torch.tensor(record['label'], dtype=torch.int64, device=device)
         return sequence_encoded, occurrences, label
-    
+
+def generate_rbp_intensity_correlation_heatmap(sequences_file, intensities_dir, htr_selex_dir, num_rbps=38, output_file='rbp_intensity_correlations_heatmap.png'):
+    """
+    Generate a heatmap of correlations between RBP intensities.
+
+    Args:
+        sequences_file (str): Path to the file containing RNA sequences.
+        intensities_dir (str): Directory containing intensity files.
+        htr_selex_dir (str): Directory containing htr-selex files.
+        num_rbps (int): Number of RBPs to include in the analysis.
+        output_file (str): Name of the output file for the heatmap.
+
+    Returns:
+        None
+    """
+    # Create datasets for all RBPs
+    datasets = [RNASequenceDataset(sequences_file, intensities_dir, htr_selex_dir, i, train=True) for i in range(1, num_rbps + 1)]
+
+    # Calculate correlations
+    correlations = np.zeros((num_rbps, num_rbps))
+    for i in range(num_rbps):
+        for j in range(num_rbps):
+            intensities_i = datasets[i].get_intensities()
+            intensities_j = datasets[j].get_intensities()
+            if intensities_i is not None and intensities_j is not None:
+                correlations[i][j] = np.corrcoef(intensities_i, intensities_j)[0, 1]
+            else:
+                correlations[i][j] = np.nan
+
+    # Create heatmap
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(correlations, cmap='coolwarm', center=0, vmin=-1, vmax=1)
+    plt.title('Correlation Heatmap of RBP Intensities')
+    plt.xlabel('RBP Index')
+    plt.ylabel('RBP Index')
+    plt.savefig(output_file)
+    plt.close()
+
+    print(f"Heatmap saved as '{output_file}'")
 
 if __name__ == '__main__':
     # Load training and testing datasets for a specific RBP{i}

@@ -1,18 +1,20 @@
 import argparse
 import logging as log
+
+import numpy as np
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
-from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split
 import torch
 
 import args
 import dataset
 from models.deepSelexCNN import DeepSELEX
 from utils import save_predictions
-
+from itertools import product
 
 def main(args):
     """
@@ -23,27 +25,37 @@ def main(args):
 
     # Load the dataset
     dataset_instance = dataset.RNASequenceDataset(
-        args.sequences_file, args.intensities_dir, args.htr_selex_dir, 
+        args.sequences_file, args.intensities_dir, args.htr_selex_dir,
         args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
     )
 
-    # Initialize KFold
-    kf = KFold(n_splits=args.kfold, shuffle=True, random_state=args.seed)
-    best_model_paths = []
+    # Split dataset into training and validation
+    train_idx, val_idx = train_test_split(
+        range(len(dataset_instance)), test_size=0.1, random_state=args.seed, shuffle=True
+    )
 
-    for fold, (train_idx, val_idx) in enumerate(kf.split(dataset_instance)):
-        log.info(f"Fold {fold + 1}")
+    # Create subsets for train and validation
+    train_subset = torch.utils.data.Subset(dataset_instance, train_idx)
+    val_subset = torch.utils.data.Subset(dataset_instance, val_idx)
 
-        # Create subsets for train and validation
-        train_subset = torch.utils.data.Subset(dataset_instance, train_idx)
-        val_subset = torch.utils.data.Subset(dataset_instance, val_idx)
+    # Create data loaders
+    train_loader = torch.utils.data.DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+    val_loader = torch.utils.data.DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-        # Create data loaders
-        train_loader = torch.utils.data.DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-        val_loader = torch.utils.data.DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    # Define hyperparameter space
+    # Generate 5 log-uniformly spaced values between 0.0005 and 0.05
+    lr_values = np.exp(np.random.uniform(np.log(0.0005), np.log(0.05), 5))
+    batch_size_values = [32, 64, 128]
+    hyperparameter_combinations = list(product(lr_values, batch_size_values))
+
+    best_val_loss = float('inf')
+    best_model_path = None
+
+    for lr, batch_size in hyperparameter_combinations:
+        log.info(f"Testing combination: lr={lr}, batch_size={batch_size}")
 
         # Initialize the model
-        model = DeepSELEX(dataset_instance.get_sequence_length(), 5, args.lr)
+        model = DeepSELEX(dataset_instance.get_sequence_length(), 5, lr)
 
         # Set up early stopping
         early_stopping = EarlyStopping('val_loss', patience=args.early_stopping, verbose=True, mode='min')
@@ -52,13 +64,13 @@ def main(args):
         checkpoint_callback = ModelCheckpoint(
             monitor='val_loss',
             dirpath=args.save_model_file,
-            filename=f'best_model_fold_{fold + 1}',
+            filename=f'best_model_lr_{lr}_batch_size_{batch_size}',
             save_top_k=1,
             mode='min'
         )
 
         # Logger
-        logger = CSVLogger(save_dir=args.log_dir, name=f'fold_{fold + 1}')
+        logger = CSVLogger(save_dir=args.log_dir, name=f'lr_{lr}_batch_size_{batch_size}')
 
         # Initialize the trainer
         trainer = Trainer(
@@ -70,13 +82,14 @@ def main(args):
         # Train the model
         trainer.fit(model, train_loader, val_loader)
 
-        # Save the best model path
-        best_model_paths.append(checkpoint_callback.best_model_path)
-        log.info(f'Saved the best model for fold {fold + 1} to {checkpoint_callback.best_model_path}')
+        # Check if this model has the best validation loss
+        if checkpoint_callback.best_model_score < best_val_loss:
+            best_val_loss = checkpoint_callback.best_model_score
+            best_model_path = checkpoint_callback.best_model_path
 
-    # Use the best model from the last fold for predictions
-    best_model_path = best_model_paths[-1]
-    log.info(f'Using the best model from fold {len(best_model_paths)} for predictions: {best_model_path}')
+        log.info(f'Saved the best model for combination lr={lr}, batch_size={batch_size} to {checkpoint_callback.best_model_path}')
+
+    log.info(f'Using the best model for predictions: {best_model_path}')
 
     if args.predict:
         # Load the best model
@@ -94,7 +107,7 @@ def main(args):
 
 if __name__ == '__main__':
     args = args.parse_args()
-    '''args = argparse.Namespace(rbp_num=1,
+    args = argparse.Namespace(rbp_num=1,
                                 predict=True,
                                 sequences_file='data/RNAcompete_sequences.txt',
                                 intensities_dir='data/RNAcompete_intensities',
@@ -102,14 +115,10 @@ if __name__ == '__main__':
                                 predict_output_dir='outputs/predictions/Deep_SELEX',
                                 save_model_file='outputs/models/Deep_SELEX.pth',
                                 load_model_file='outputs/models/Deep_SELEX.pth',
-                                batch_size=64,
                                 epochs=100,
-                                lr=0.001,
                                 early_stopping=10,
                                 seed=32,
-                                kfold=10,
-                                trim=False,
                                 negative_examples=1000,
-                                log_dir='outputs/logs/Deep_SELEX')'''
+                                log_dir='outputs/logs/Deep_SELEX')
     log.basicConfig(level=log.INFO)
     main(args)
