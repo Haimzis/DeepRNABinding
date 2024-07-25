@@ -283,6 +283,8 @@ def compute_baseline_helper(last_cycle_path, rnacompete_path, binding_intensitie
 
     with open(last_cycle_path, 'r') as file:
         sequences = [line.strip().split(',')[0] for line in file]
+        # Remove sequences that contain 'N' characters
+        sequences = [seq for seq in sequences if 'N' not in seq]
 
     """
     # Read sequences and their occurrences, then repeat sequences based on occurrences
@@ -331,7 +333,7 @@ if __name__ == '__main__':
     intensities_dir = 'data/RNAcompete_intensities'
     htr_selex_dir = 'data/htr-selex'
 
-    i = 1  # Set i to 1 for now
+    """i = 1  # Set i to 1 for now
 
     train_dataset = RNASequenceDataset(sequences_file, intensities_dir, htr_selex_dir, i, train=True)
 
@@ -344,4 +346,6 @@ if __name__ == '__main__':
     # Example usage of new methods
     for batch in train_loader:
         sequences, occurrences, labels = batch
-        print(sequences.shape, sequences.device)  # Should print (32, Sequence Length, Embedding Length)
+        print(sequences.shape, sequences.device)  # Should print (32, Sequence Length, Embedding Length)"""
+
+    compute_baseline(sequences_file, intensities_dir, htr_selex_dir)
