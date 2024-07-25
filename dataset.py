@@ -1,11 +1,18 @@
 import os
+from collections import defaultdict
+from itertools import product
+
 import numpy as np
 import pandas as pd
 import torch
+from scipy.stats import pearsonr
 from torch.utils.data import Dataset, DataLoader, Subset, TensorDataset
 from sklearn.model_selection import KFold
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_selection import SelectKBest, chi2
+import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -15,7 +22,6 @@ nucleotide_to_onehot = {
     'C': [0, 1, 0, 0],
     'G': [0, 0, 1, 0],
     'T': [0, 0, 0, 1],
-    'U': [0, 0, 0, 1],
     'N': [0.25, 0.25, 0.25, 0.25]
 }
 
@@ -250,9 +256,78 @@ def generate_rbp_intensity_correlation_heatmap(sequences_file, intensities_dir, 
 
     print(f"Heatmap saved as '{output_file}'")
 
+def compute_baseline(sequences_file, intensities_dir, htr_selex_dir):
+    # Calculate correlations
+    correlations = []
+    for i in range(38):
+        last_cycle_path = os.path.join(htr_selex_dir, f'RBP{i + 1}_4.txt') if os.path.exists(os.path.join(htr_selex_dir, f'RBP{i + 1}_4.txt')) else os.path.join(htr_selex_dir, f'RBP{i + 1}_3.txt')
+        rnacompete_path = sequences_file
+        binding_intensities_path = os.path.join(intensities_dir, f'RBP{i + 1}.txt')
+        correlations.append(compute_baseline_helper(last_cycle_path, rnacompete_path, binding_intensities_path))
+        print(f"Correlation for RBP{i + 1}: {correlations[i]}")
+
+
+    # Save correlations to a file
+    with open('baseline_correlations.txt', 'w') as file:
+        for correlation in correlations:
+            file.write(f'{correlation}\n')
+
+    print(f"Correlations saved to 'baseline_correlations.txt'")
+
+def compute_baseline_helper(last_cycle_path, rnacompete_path, binding_intensities_path):
+    # Generate all possible 7-mers, 4^7 = 16384
+    all_7mers = [''.join(combo) for combo in product('ACGT', repeat=7)]
+
+    # Count 7-mers in the last cycle file
+    vectorizer = CountVectorizer(vocabulary=all_7mers, analyzer='char', ngram_range=(7, 7), lowercase=False)
+
+    with open(last_cycle_path, 'r') as file:
+        sequences = [line.strip().split(',')[0] for line in file]
+
+    """
+    # Read sequences and their occurrences, then repeat sequences based on occurrences
+    sequences = []
+    with open(last_cycle_path, 'r') as file:
+        for line in file:
+            parts = line.strip().split(',')
+            if len(parts) >= 2:
+                seq, count = parts[0], parts[1]
+                try:
+                    count = int(count)
+                    sequences.extend([seq] * count)
+                except ValueError:
+                    print(f"Warning: Invalid count '{count}' for sequence '{seq}'. Skipping.")
+            else:
+                print(f"Warning: Invalid line format: {line.strip()}. Skipping.")
+    """
+
+    counts = vectorizer.fit_transform(sequences)
+    seven_mer_scores = np.array(counts.sum(axis=0)).flatten()
+
+    # Score RNAcompete sequences
+    with open(rnacompete_path, 'r') as file:
+        rnacompete_sequences = [line.strip().split()[0] for line in file]
+
+    # Use CountVectorizer to efficiently extract and count 7-mers
+    rnacompete_counts = vectorizer.fit_transform(rnacompete_sequences)
+
+    # Compute scores for each sequence
+    rnacompete_scores = rnacompete_counts.dot(seven_mer_scores)
+    seq_lens = np.array([len(seq) - 6 for seq in rnacompete_sequences])
+    rnacompete_scores = rnacompete_scores / seq_lens
+
+    # Load binding intensities
+    binding_intensities = np.loadtxt(binding_intensities_path)
+
+    # Compute Pearson correlation
+    correlation, _ = pearsonr(rnacompete_scores, binding_intensities)
+
+    return correlation
+
+
 if __name__ == '__main__':
     # Load training and testing datasets for a specific RBP{i}
-    sequences_file = 'data/RNAcompete_sequences.txt'
+    sequences_file = 'data/RNAcompete_sequences_rc.txt'
     intensities_dir = 'data/RNAcompete_intensities'
     htr_selex_dir = 'data/htr-selex'
 

@@ -107,7 +107,7 @@ def main(args):
 
 if __name__ == '__main__':
     args = args.parse_args()
-    args = argparse.Namespace(rbp_num=1,
+    '''args = argparse.Namespace(rbp_num=1,
                                 predict=True,
                                 sequences_file='data/RNAcompete_sequences.txt',
                                 intensities_dir='data/RNAcompete_intensities',
@@ -115,10 +115,14 @@ if __name__ == '__main__':
                                 predict_output_dir='outputs/predictions/Deep_SELEX',
                                 save_model_file='outputs/models/Deep_SELEX.pth',
                                 load_model_file='outputs/models/Deep_SELEX.pth',
+                                batch_size=64,
                                 epochs=100,
+                                lr=0.001,
                                 early_stopping=10,
                                 seed=32,
+                                kfold=10,
+                                trim=False,
                                 negative_examples=1000,
-                                log_dir='outputs/logs/Deep_SELEX')
+                                log_dir='outputs/logs/Deep_SELEX')'''
     log.basicConfig(level=log.INFO)
     main(args)
