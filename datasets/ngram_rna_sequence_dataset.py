@@ -5,10 +5,9 @@ import pandas as pd
 import torch
 from datasets.base_dataset import BaseRNASequenceDataset
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class NgramRNASequenceDataset(BaseRNASequenceDataset):
-    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, train=True, trim=False, negative_examples=0, n=(3, 6), top_m="all", binary_embedding=False):
+    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, train=True, trim=False, negative_examples=0, n=(4, 7), top_m="all", binary_embedding=False):
         super().__init__(sequences_file, intensities_dir, htr_selex_dir, i, train, trim, negative_examples)
         self.n = n
         self.top_m = top_m
@@ -38,8 +37,8 @@ class NgramRNASequenceDataset(BaseRNASequenceDataset):
 
     def __getitem__(self, idx):
         record = self.data[idx]
-        features = torch.tensor(self.features[idx].toarray()[0], dtype=torch.float32, device=device)
-        label = torch.tensor(record['label'], dtype=torch.int64, device=device)
+        features = torch.tensor(self.features[idx].toarray()[0], dtype=torch.float32)  # Ensure the tensor is on CPU
+        label = torch.tensor(record['label'], dtype=torch.int64)
         return features, label
 
     def get_sequence_length(self):

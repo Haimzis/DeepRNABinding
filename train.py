@@ -17,8 +17,8 @@ import args
 # import dataset
 from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
 from datasets.rna_sequence_dataset import RNASequenceDataset
-# from models.deepSelexDNN import DeepSELEX
-from models.deepSelexCNN import DeepSELEX
+from models.deepSelexDNN import DeepSELEX
+# from models.deepSelexCNN import DeepSELEX
 from utils import save_predictions
 from itertools import product
 
@@ -30,15 +30,15 @@ def main(args):
     # Set the seed for reproducibility
     pl.seed_everything(args.seed)
 
-    ## Load the dataset
-    # dataset_instance = NgramRNASequenceDataset(
-    #     args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-    #     args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
-    # )
-    dataset_instance = RNASequenceDataset(
-    args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-    args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
+    # Load the dataset
+    dataset_instance = NgramRNASequenceDataset(
+        args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+        args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
     )
+    # dataset_instance = RNASequenceDataset(
+    # args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+    # args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
+    # )
 
     # Split dataset into training and validation
     train_idx, val_idx = train_test_split(
@@ -50,8 +50,8 @@ def main(args):
     val_subset = torch.utils.data.Subset(dataset_instance, val_idx)
 
     # Define hyperparameter space
-    lr_values = [0.001]
-    batch_size_values = [64]
+    lr_values = [0.005]
+    batch_size_values = [256]
     hyperparameter_combinations = list(product(lr_values, batch_size_values))
 
     best_val_loss = float('inf')
@@ -61,8 +61,8 @@ def main(args):
         log.info(f"Testing combination: lr={lr}, batch_size={batch_size}")
 
         # Create data loaders
-        train_loader = torch.utils.data.DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=1)
-        val_loader = torch.utils.data.DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=1)
+        train_loader = torch.utils.data.DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
+        val_loader = torch.utils.data.DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True, persistent_workers=True)
 
         # Initialize the model
         model = DeepSELEX(dataset_instance.get_sequence_length(), 5, lr)
@@ -87,7 +87,8 @@ def main(args):
         trainer = Trainer(
             max_epochs=args.epochs,
             callbacks=[early_stopping, checkpoint_callback],
-            logger=logger
+            logger=logger,
+            devices=[0]
         )
 
         # Train the model

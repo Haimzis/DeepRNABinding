@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from torchmetrics.classification import MulticlassAccuracy
 
 class DeepSELEX(pl.LightningModule):
-    def __init__(self, input_size, output_size, lr=0.003, dropout_rate=0.05):
+    def __init__(self, input_size, output_size, lr=0.003, dropout_rate=0.4):
         """
         Constructor for the DeepSELEXDNN model adapted for N-gram features.
         Args:
