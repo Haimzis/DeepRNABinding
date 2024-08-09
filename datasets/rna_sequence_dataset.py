@@ -4,7 +4,6 @@ from torch.utils.data import DataLoader, TensorDataset
 import pandas as pd
 from datasets.base_dataset import BaseRNASequenceDataset, encode_sequence
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class RNASequenceDataset(BaseRNASequenceDataset):
     def process_data(self):
@@ -18,9 +17,9 @@ class RNASequenceDataset(BaseRNASequenceDataset):
 
     def __getitem__(self, idx):
         record = self.data[idx]
-        sequence_encoded = torch.tensor(encode_sequence(record['sequence']), dtype=torch.float32, device=device)
-        occurrences = torch.tensor(record['occurrences'], dtype=torch.int64, device=device)
-        label = torch.tensor(record['label'], dtype=torch.int64, device=device)
+        sequence_encoded = torch.tensor(encode_sequence(record['sequence']), dtype=torch.float32)
+        occurrences = torch.tensor(record['occurrences'], dtype=torch.int64)
+        label = torch.tensor(record['label'], dtype=torch.int64)
         return sequence_encoded, occurrences, label
 
     def create_test_loader(self, batch_size=32):
