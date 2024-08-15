@@ -103,11 +103,6 @@ class DeepSELEX(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        acc = self.accuracy(outputs, y)
-        auroc = self.auroc(outputs, y)
-        self.log('train_loss', loss, prog_bar=True, logger=True)
-        self.log('train_acc', acc, prog_bar=False, logger=True)
-        self.log('train_auroc', auroc, prog_bar=False, logger=True)
         return loss
 
     def predict_step(self, batch, batch_idx):
