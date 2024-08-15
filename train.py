@@ -100,6 +100,11 @@ def main(args):
 
         log.info(f'Saved the best model for combination lr={lr}, batch_size={batch_size} to {checkpoint_callback.best_model_path}')
 
+        # Print validation set metrics
+        log.info("Validation set metrics")
+        validation_results = trainer.validate(model, val_loader)
+
+
     log.info(f'Using the best model for predictions: {best_model_path}')
 
     if args.predict:
@@ -107,20 +112,26 @@ def main(args):
         best_model = DeepSELEX.load_from_checkpoint(best_model_path)
 
         # Create test dataset for RBP_i
-        test_dataset = NgramRNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False)
+        test_dataset = RNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False)
         test_loader = test_dataset.create_test_loader(args.batch_size)
 
         # Predict the intensity levels
         predictions = trainer.predict(best_model, dataloaders=test_loader)
         predictions = torch.cat(predictions, dim=0)
+
+        # Print Pearson correlation
+        pearson_corr = dataset_instance.get_pearson_correlation(predictions.cpu().numpy())
+        log.info(f"Pearson correlation: {pearson_corr:.4f}")
+
+        # Save the predictions
         save_predictions(predictions, args.predict_output_dir)
         log.info(f'Saved the predictions to {args.predict_output_dir}')
 
 if __name__ == '__main__':
     args = args.parse_args()
-    '''args = argparse.Namespace(rbp_num=1,
+    args = argparse.Namespace(rbp_num=1,
                                 predict=True,
-                                sequences_file='data/RNAcompete_sequences.txt',
+                                sequences_file='data/RNAcompete_sequences_rc.txt',
                                 intensities_dir='data/RNAcompete_intensities',
                                 htr_selex_dir='data/htr-selex',
                                 predict_output_dir='outputs/predictions/Deep_SELEX',
@@ -134,6 +145,6 @@ if __name__ == '__main__':
                                 kfold=10,
                                 trim=False,
                                 negative_examples=1000,
-                                log_dir='outputs/logs/Deep_SELEX')'''
+                                log_dir='outputs/logs/Deep_SELEX')
     log.basicConfig(level=log.INFO)
     main(args)

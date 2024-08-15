@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
+from torchmetrics import AUROC
+from torchmetrics.classification import MulticlassAccuracy
 
 
 class DeepSELEX(pl.LightningModule):
@@ -15,6 +17,9 @@ class DeepSELEX(pl.LightningModule):
             lr (float): The learning rate for training.
         """
         super(DeepSELEX, self).__init__()
+        self.accuracy = MulticlassAccuracy(num_classes=output_size)
+        self.auroc = AUROC(num_classes=output_size, task="multiclass")
+
         self.save_hyperparameters()
         self.conv1 = nn.Conv1d(in_channels=4, out_channels=512, kernel_size=8, stride=1)
         self.pool = nn.MaxPool1d(kernel_size=5, stride=5)
@@ -98,7 +103,11 @@ class DeepSELEX(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        self.log('val_loss', loss)
+        acc = self.accuracy(outputs, y)
+        auroc = self.auroc(outputs, y)
+        self.log('train_loss', loss, prog_bar=True, logger=True)
+        self.log('train_acc', acc, prog_bar=False, logger=True)
+        self.log('train_auroc', auroc, prog_bar=False, logger=True)
         return loss
 
     def predict_step(self, batch, batch_idx):

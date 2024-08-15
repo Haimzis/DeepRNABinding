@@ -78,6 +78,17 @@ class BaseRNASequenceDataset(Dataset):
 
         return combined_df.to_records(index=False)
 
+    def get_pearson_correlation(self, predictions):
+        """Calculates the Pearson correlation between the predictions and intensities.
+
+        Args:
+            predictions (np.ndarray): The predictions from the model.
+
+        Returns:
+            float: The Pearson correlation between the predictions and intensities.
+        """
+        return np.corrcoef(predictions, self.intensities)[0, 1]
+
     def process_data(self):
         """Processes the loaded data."""
         raise NotImplementedError("Subclasses should implement this method.")
