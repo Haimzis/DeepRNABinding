@@ -9,16 +9,17 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from sklearn.model_selection import train_test_split
+from scipy.stats import pearsonr
 
 # Set the multiprocessing start method
 mp.set_start_method('spawn', force=True)
 
 import args
 # import dataset
-from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
+# from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
 from datasets.rna_sequence_dataset import RNASequenceDataset
-from models.deepSelexDNN import DeepSELEX
-# from models.deepSelexCNN import DeepSELEX
+# from models.deepSelexDNN import DeepSELEX
+from models.deepSelexCNN import DeepSELEX
 from utils import save_predictions
 from itertools import product
 
@@ -31,14 +32,14 @@ def main(args):
     pl.seed_everything(args.seed)
 
     # Load the dataset
-    dataset_instance = NgramRNASequenceDataset(
-        args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-        args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
-    )
-    # dataset_instance = RNASequenceDataset(
-    # args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-    # args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
+    # dataset_instance = NgramRNASequenceDataset(
+    #     args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+    #     args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
     # )
+    dataset_instance = RNASequenceDataset(
+        args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+        args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
+    )
 
     # Split dataset into training and validation
     train_idx, val_idx = train_test_split(
@@ -65,7 +66,7 @@ def main(args):
         val_loader = torch.utils.data.DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True, persistent_workers=True)
 
         # Initialize the model
-        model = DeepSELEX(dataset_instance.get_sequence_length(), 5, lr)
+        model = DeepSELEX(dataset_instance.get_sequence_length(), 4, lr)
 
         # Set up early stopping
         early_stopping = EarlyStopping('val_loss', patience=args.early_stopping, verbose=True, mode='min')
@@ -85,10 +86,10 @@ def main(args):
 
         # Initialize the trainer
         trainer = Trainer(
-            max_epochs=args.epochs,
+            max_epochs=1, #args.epochs,
             callbacks=[early_stopping, checkpoint_callback],
             logger=logger,
-            devices=[0]
+            devices=[0],
         )
 
         # Train the model
@@ -108,14 +109,20 @@ def main(args):
         best_model = DeepSELEX.load_from_checkpoint(best_model_path)
 
         # Create test dataset for RBP_i
-        test_dataset = NgramRNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False)
-        test_loader = test_dataset.create_test_loader(args.batch_size)
+        # test_dataset = NgramRNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False)
+        test_dataset = RNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, trim=args.trim, train=False)
+
+        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, persistent_workers=True)
 
         # Predict the intensity levels
         predictions = trainer.predict(best_model, dataloaders=test_loader)
         predictions = torch.cat(predictions, dim=0)
         save_predictions(predictions, args.predict_output_dir)
+        correlation, _ = pearsonr(test_dataset.intensities, predictions)
         log.info(f'Saved the predictions to {args.predict_output_dir}')
+        log.info(f'Pearson Correlation for RBP{args.rbp_num}: {correlation}')
+
+
 
 if __name__ == '__main__':
     args = args.parse_args()

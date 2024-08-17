@@ -1,4 +1,3 @@
-import argparse
 import logging as log
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
@@ -9,7 +8,7 @@ from sklearn.model_selection import KFold
 import torch
 
 import args
-import dataset
+from datasets.rna_sequence_dataset import RNASequenceDataset
 from models.deepSelexCNN import DeepSELEX
 from utils import save_predictions
 
@@ -22,7 +21,7 @@ def main(args):
     pl.seed_everything(args.seed)
 
     # Load the dataset
-    dataset_instance = dataset.RNASequenceDataset(
+    dataset_instance = RNASequenceDataset(
         args.sequences_file, args.intensities_dir, args.htr_selex_dir, 
         args.rbp_num, train=True, trim=args.trim, negative_examples=args.negative_examples
     )
@@ -83,7 +82,7 @@ def main(args):
         best_model = DeepSELEX.load_from_checkpoint(best_model_path)
 
         # Create test dataset for RBP_i
-        test_dataset = dataset.RNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False)
+        test_dataset = RNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False)
         test_loader = test_dataset.create_test_loader(args.batch_size)
 
         # Predict the intensity levels

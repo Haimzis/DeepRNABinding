@@ -1,15 +1,24 @@
 # main_rna.py
+import sys
+import os
+
+# Add the current directory to sys.path
+current_directory = os.getcwd()
+if current_directory not in sys.path:
+    sys.path.append(current_directory)
+
 import argparse
 from torch.utils.data import DataLoader
 from rna_sequence_dataset import RNASequenceDataset # load desired dataset 
 
 def main():
     parser = argparse.ArgumentParser(description="Test RNASequenceDataset.")
-    parser.add_argument('--sequences_file', type=str, required=True, help='Path to the RNA sequences file.')
-    parser.add_argument('--intensities_dir', type=str, required=True, help='Directory containing intensity files.')
-    parser.add_argument('--htr_selex_dir', type=str, required=True, help='Directory containing htr-selex files.')
-    parser.add_argument('--rbp_num', type=int, required=True, help='RBP index number.')
+    parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
+    parser.add_argument('--intensities_dir', type=str, default='data/RNAcompete_intensities', help='Directory containing the intensity levels.')
+    parser.add_argument('--htr_selex_dir', type=str, default='data/htr-selex', help='Directory containing the HTR-SELEX documents.')
+    parser.add_argument('--rbp_num', type=int, default=1, help='RBP index number.')
     parser.add_argument('--trim', type=bool, default=False, help='Trim the data for faster debugging.')
+    parser.add_argument('--train', type=bool, default=False, help='Load HTR-SELEX or RNACompete sequences.')
     parser.add_argument('--negative_examples', type=int, default=0, help='Number of negative samples to generate.')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loader.')
     args = parser.parse_args()
@@ -19,8 +28,8 @@ def main():
         intensities_dir=args.intensities_dir,
         htr_selex_dir=args.htr_selex_dir,
         i=args.rbp_num,
-        train=True,
         trim=args.trim,
+        train=args.train,
         negative_examples=args.negative_examples
     )
 
