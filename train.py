@@ -16,10 +16,10 @@ mp.set_start_method('spawn', force=True)
 
 import args
 # import dataset
-# from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
+from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
 from datasets.rna_sequence_dataset import RNASequenceDataset
-# from models.deepSelexDNN import DeepSELEX
-from models.deepSelexCNN import DeepSELEX
+from models.deepSelexDNN import DeepSELEX
+# from models.deepSelexCNN import DeepSELEX
 from utils import save_predictions
 from itertools import product
 
@@ -32,14 +32,14 @@ def main(args):
     pl.seed_everything(args.seed)
 
     # Load the dataset
-    # dataset_instance = NgramRNASequenceDataset(
-    #     args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-    #     args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
-    # )
-    dataset_instance = RNASequenceDataset(
+    dataset_instance = NgramRNASequenceDataset(
         args.sequences_file, args.intensities_dir, args.htr_selex_dir,
         args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
     )
+    # dataset_instance = RNASequenceDataset(
+    #     args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+    #     args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
+    # )
 
     # Split dataset into training and validation
     train_idx, val_idx = train_test_split(
@@ -109,8 +109,8 @@ def main(args):
         best_model = DeepSELEX.load_from_checkpoint(best_model_path)
 
         # Create test dataset for RBP_i
-        # test_dataset = NgramRNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False)
-        test_dataset = RNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, trim=args.trim, train=False)
+        test_dataset = NgramRNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False, vectorizer=dataset_instance.vectorizer, selector=dataset_instance.selector)
+        # test_dataset = RNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, trim=args.trim, train=False)
 
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, persistent_workers=True)
 

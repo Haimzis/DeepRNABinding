@@ -17,7 +17,7 @@ def main(args):
     log.basicConfig(level=log.INFO)
 
     # Initialize Baseline Model
-    baseline_model = BaselineModel(args.htr_selex_dir, args.sequences_file, args.intensities_dir)
+    baseline_model = BaselineModel(args.htr_selex_dir, args.sequences_file, args.intensities_dir, 7)
 
     # Compute baseline correlations
     correlations = baseline_model.compute_baseline(num_rbps=args.rbp_num)
