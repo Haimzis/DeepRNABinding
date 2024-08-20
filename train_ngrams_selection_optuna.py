@@ -62,8 +62,8 @@ if __name__ == '__main__':
     args = parse_args()
 
     # Create the Optuna study
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=50)
+    study = optuna.create_study(direction='maximize', pruner=optuna.pruners.MedianPruner())
+    study.optimize(objective, n_trials=50, n_jobs=1)
 
     # Print the best hyperparameters found
     print(f"Best hyperparameters: {study.best_params}")
