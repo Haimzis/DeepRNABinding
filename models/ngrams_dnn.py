@@ -4,8 +4,9 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from torchmetrics.classification import MulticlassAccuracy
 
-class DeepSELEX(pl.LightningModule):
-    def __init__(self, input_size, output_size, lr=0.003, dropout_rate=0.4):
+
+class NGramDNN(pl.LightningModule):
+    def __init__(self, input_size, output_size, lr=0.003, dropout_rate=0.25):
         """
         Constructor for the DeepSELEXDNN model adapted for N-gram features.
         Args:
@@ -14,7 +15,7 @@ class DeepSELEX(pl.LightningModule):
             lr (float): The learning rate for training.
             dropout_rate (float): The dropout rate for regularization.
         """
-        super(DeepSELEX, self).__init__()
+        super(NGramDNN, self).__init__()
         self.save_hyperparameters()
 
         self.accuracy = MulticlassAccuracy(num_classes=output_size)

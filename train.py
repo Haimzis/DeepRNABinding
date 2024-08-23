@@ -1,147 +1,181 @@
-import argparse
 import logging as log
-
+import argparse
 import torch
-import torch.multiprocessing as mp
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
+from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
 from scipy.stats import pearsonr
+from torch.utils.data import DataLoader, Subset
+from utils import print_args, save_predictions
 
-# Set the multiprocessing start method
-mp.set_start_method('spawn', force=True)
-
-import args
-# import dataset
+# Import datasets and models
 from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
 from datasets.rna_sequence_dataset import RNASequenceDataset
-from models.deepSelexDNN import DeepSELEX
-# from models.deepSelexCNN import DeepSELEX
-from utils import save_predictions
-from itertools import product
+from datasets.rnabert_dataset import RNABERTDataset
+from models.cnn_attention import CNNAttention
+from models.ngrams_dnn import NGramDNN
+from models.bidirectional_lstm import BiDirectionalLSTM
+from models.deepselex import DeepSELEX
+from models.rna_bert import RnaBert
+
+# Argument parsing
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default='CNNAttention', help='Model to use: CNNAttention, DeepSELEX, LSTMSELEX, RnaBert, NGramDNN')
+parser.add_argument('--rbp_num', type=int, default=1, help='The number of the RNA binding protein to predict.')
+parser.add_argument('--predict', type=bool, default=True, help='Predict the intensity levels.')
+parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
+parser.add_argument('--intensities_dir', type=str, default='data/RNAcompete_intensities', help='Directory containing the intensity levels.')
+parser.add_argument('--htr_selex_dir', type=str, default='data/htr-selex', help='Directory containing the HTR-SELEX documents.')
+parser.add_argument('--predict_output_dir', type=str, default='outputs/predictions/Deep_SELEX', help='Directory to save the predictions.')
+parser.add_argument('--save_model_file', type=str, default='outputs/models/Deep_SELEX', help='Directory to save the model.')
+parser.add_argument('--load_model_file', type=str, default='outputs/models/Deep_SELEX/best_model.ckpt', help='File to load the model.')
+parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training.')
+parser.add_argument('--epochs', type=int, default=50, help='Number of epochs for training.')
+parser.add_argument('--lr', type=float, default=0.001, help='Learning rate for training.')
+parser.add_argument('--early_stopping', type=int, default=10, help='Number of epochs for early stopping.')
+parser.add_argument('--seed', type=int, default=24, help='Seed for random number generator.')
+parser.add_argument('--trim', type=bool, default=False, help='Whether to trim the data for faster debugging.')
+parser.add_argument('--negative_examples', type=int, default=0, help='Number of negative samples to generate.')
+parser.add_argument('--log_dir', type=str, default='logs', help='Directory to save the logs.')
+parser.add_argument('--num_classes', type=int, default=4, help='Num of possible classes.')
+args = parser.parse_args()
 
 
-def main(args):
+def select_model_and_dataset(args):
     """
-    Main function for the DeepSELEX model.
+    Selects and returns the model and dataset based on provided arguments, ensuring compatibility.
     """
-    # Set the seed for reproducibility
-    pl.seed_everything(args.seed)
+    # Select training and test dataset
+    if args.model in ['NGramDNN']:
+        train_dataset = NgramRNASequenceDataset(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, n=(7, 9), binary_embedding=False, top_m=1024
+        )
+        test_dataset = NgramRNASequenceDataset(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, vectorizer=train_dataset.vectorizer, selector=train_dataset.selector
+        )
+    elif args.model in ['CNNAttention', 'DeepSELEX', 'LSTMSELEX']:
+        train_dataset = RNASequenceDataset(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
+        )
+        test_dataset = RNASequenceDataset(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples
+        )
+    elif args.model in ['RnaBert']:
+        train_dataset = RNABERTDataset(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, max_length=41
+        )
+        test_dataset = RNABERTDataset(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, max_length=41
+        )
+    else:
+        raise ValueError(f"Dataset {args.dataset} not recognized.")
 
-    # Load the dataset
-    dataset_instance = NgramRNASequenceDataset(
-        args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-        args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
-    )
-    # dataset_instance = RNASequenceDataset(
-    #     args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-    #     args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
-    # )
+    # Select model
+    if args.model == 'CNNAttention':
+        model = CNNAttention(input_size=train_dataset.get_sequence_length(), num_classes=4, lr=args.lr, kernel_size=9, num_filters=2048, attention_dim=512)
+    elif args.model == 'DeepSELEX':
+        model = DeepSELEX(input_size=train_dataset.get_sequence_length(), output_size=4, lr=args.lr)
+    elif args.model == 'NGramDNN':
+        model = NGramDNN(input_size=train_dataset.get_sequence_length(), output_size=4, lr=args.lr)
+    elif args.model == 'LSTMSELEX':
+        model = BiDirectionalLSTM(num_classes=4, lr=args.lr)
+    elif args.model == 'RnaBert':
+        model = RnaBert(output_size=4, lr=args.lr)
+    else:
+        raise ValueError(f"Model {args.model} not recognized.")
 
-    # Split dataset into training and validation
+    return model, train_dataset, test_dataset
+
+
+def train_model(model, dataset, test_dataset, args):
+    """
+    Train the given model on the provided dataset using specified arguments.
+    
+    Args:
+        model: PyTorch Lightning model to be trained.
+        dataset: Dataset instance containing training and validation data.
+        test_dataset: Dataset instance containing testing data.
+        args: Namespace object containing training configurations and hyperparameters.
+    """
+    # Split dataset into training and validation sets
     train_idx, val_idx = train_test_split(
-        range(len(dataset_instance)), test_size=0.05, random_state=args.seed, shuffle=True, stratify=dataset_instance.data['label']
+        range(len(dataset)), test_size=0.15, random_state=args.seed, shuffle=True, stratify=dataset.data['label']
     )
 
-    # Create subsets for train and validation
-    train_subset = torch.utils.data.Subset(dataset_instance, train_idx)
-    val_subset = torch.utils.data.Subset(dataset_instance, val_idx)
+    # Create subsets for training and validation
+    train_subset = Subset(dataset, train_idx)
+    val_subset = Subset(dataset, val_idx)
 
-    # Define hyperparameter space
-    lr_values = [0.005]
-    batch_size_values = [256]
-    hyperparameter_combinations = list(product(lr_values, batch_size_values))
+    # Create data loaders
+    train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
+    val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, persistent_workers=True)
 
-    best_val_loss = float('inf')
-    best_model_path = None
+    # Set up early stopping
+    early_stopping = EarlyStopping('val_loss', patience=args.early_stopping, verbose=True, mode='min')
 
-    for lr, batch_size in hyperparameter_combinations:
-        log.info(f"Testing combination: lr={lr}, batch_size={batch_size}")
+    # Set up model checkpointing
+    checkpoint_callback = ModelCheckpoint(
+        monitor='val_loss',
+        dirpath=args.save_model_file,
+        filename='best_model',
+        save_top_k=1,
+        mode='min'
+    )
 
-        # Create data loaders
-        train_loader = torch.utils.data.DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
-        val_loader = torch.utils.data.DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True, persistent_workers=True)
+    # Set up logger
+    logger = TensorBoardLogger(save_dir=args.log_dir, name='training_logs')
 
-        # Initialize the model
-        model = DeepSELEX(dataset_instance.get_sequence_length(), 4, lr)
+    # Initialize the trainer
+    trainer = Trainer(
+        max_epochs=args.epochs,
+        callbacks=[early_stopping, checkpoint_callback],
+        logger=logger,
+        devices=[0],
+        num_sanity_val_steps=0,
+    )
 
-        # Set up early stopping
-        early_stopping = EarlyStopping('val_loss', patience=args.early_stopping, verbose=True, mode='min')
+    # Train the model
+    trainer.fit(model, train_loader, val_loader)
 
-        # Set up model checkpointing
-        checkpoint_callback = ModelCheckpoint(
-            monitor='val_loss',
-            dirpath=args.save_model_file,
-            filename=f'best_model_lr_{lr}_batch_size_{batch_size}',
-            save_top_k=1,
-            mode='min'
-        )
-
-        # Logger
-        # logger = CSVLogger(save_dir=args.log_dir, name=f'lr_{lr}_batch_size_{batch_size}')
-        logger = TensorBoardLogger(save_dir=args.log_dir, name=f'lr_{lr}_batch_size_{batch_size}')
-
-        # Initialize the trainer
-        trainer = Trainer(
-            max_epochs=1, #args.epochs,
-            callbacks=[early_stopping, checkpoint_callback],
-            logger=logger,
-            devices=[0],
-        )
-
-        # Train the model
-        trainer.fit(model, train_loader, val_loader)
-
-        # Check if this model has the best validation loss
-        if checkpoint_callback.best_model_score < best_val_loss:
-            best_val_loss = checkpoint_callback.best_model_score
-            best_model_path = checkpoint_callback.best_model_path
-
-        log.info(f'Saved the best model for combination lr={lr}, batch_size={batch_size} to {checkpoint_callback.best_model_path}')
-
-    log.info(f'Using the best model for predictions: {best_model_path}')
+    log.info(f'Saved the best model to {checkpoint_callback.best_model_path}')
 
     if args.predict:
         # Load the best model
-        best_model = DeepSELEX.load_from_checkpoint(best_model_path)
+        best_model = model.load_from_checkpoint(checkpoint_callback.best_model_path)
 
-        # Create test dataset for RBP_i
-        test_dataset = NgramRNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num, train=False, vectorizer=dataset_instance.vectorizer, selector=dataset_instance.selector)
-        # test_dataset = RNASequenceDataset(args.sequences_file, args.intensities_dir, args.htr_selex_dir, trim=args.trim, train=False)
-
-        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, persistent_workers=True)
+        # Create a test dataset for prediction
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
 
         # Predict the intensity levels
         predictions = trainer.predict(best_model, dataloaders=test_loader)
         predictions = torch.cat(predictions, dim=0)
         save_predictions(predictions, args.predict_output_dir)
+
         correlation, _ = pearsonr(test_dataset.intensities, predictions)
         log.info(f'Saved the predictions to {args.predict_output_dir}')
         log.info(f'Pearson Correlation for RBP{args.rbp_num}: {correlation}')
 
 
-
 if __name__ == '__main__':
-    args = args.parse_args()
-    '''args = argparse.Namespace(rbp_num=1,
-                                predict=True,
-                                sequences_file='data/RNAcompete_sequences.txt',
-                                intensities_dir='data/RNAcompete_intensities',
-                                htr_selex_dir='data/htr-selex',
-                                predict_output_dir='outputs/predictions/Deep_SELEX',
-                                save_model_file='outputs/models/Deep_SELEX.pth',
-                                load_model_file='outputs/models/Deep_SELEX.pth',
-                                batch_size=64,
-                                epochs=100,
-                                lr=0.001,
-                                early_stopping=10,
-                                seed=32,
-                                kfold=10,
-                                trim=False,
-                                negative_examples=1000,
-                                log_dir='outputs/logs/Deep_SELEX')'''
+    # Set the seed for reproducibility
+    pl.seed_everything(args.seed)
     log.basicConfig(level=log.INFO)
-    main(args)
+    print_args(args)
+
+    try:
+        # Select model, training dataset, and test dataset
+        model, train_dataset, test_dataset = select_model_and_dataset(args)
+
+        # Train the model and evaluate using the test dataset
+        train_model(model, train_dataset, test_dataset, args)
+    except ValueError as e:
+        log.error(e)

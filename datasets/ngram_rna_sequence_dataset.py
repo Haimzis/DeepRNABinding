@@ -12,8 +12,8 @@ class NgramRNASequenceDataset(BaseRNASequenceDataset):
         self.n = n
         self.top_m = top_m
         self.binary_embedding = binary_embedding
-        self.vectorizer = vectorizer  # Allow passing in the vectorizer from outside
-        self.selector = selector  # Allow passing in the selector from outside
+        self.vectorizer = vectorizer
+        self.selector = selector
         self.top_indices, self.features = self.extract_and_select_top_ngrams()
 
     def extract_and_select_top_ngrams(self):

@@ -1,7 +1,7 @@
 import argparse
 import optuna
 import os
-from models.ngramModel import NgramModel
+from models.selected_ngram_projection import SelectedNGramProjectionModel
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Compute correlations for RNA binding proteins using clustering.')
@@ -20,8 +20,8 @@ def objective(trial):
     top_k = trial.suggest_int('top_k', 1024, 16_384)
     binary_embedding = trial.suggest_categorical('binary_embedding', [True, False])
 
-    # Initialize the NgramModel with the suggested hyperparameters
-    rbp_model = NgramModel(
+    # Initialize the SelectedNGramProjectionModel with the suggested hyperparameters
+    rbp_model = SelectedNGramProjectionModel(
         htr_selex_dir=args.htr_selex_dir,
         sequences_file=args.sequences_file,
         intensities_dir=args.intensities_dir,

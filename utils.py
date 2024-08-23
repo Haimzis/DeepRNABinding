@@ -71,3 +71,15 @@ def generate_rbp_intensity_correlation_heatmap(sequences_file, intensities_dir, 
 def get_person_correlation(self, predictions, intensities):
     """Calculates the Pearson correlation between the predictions and intensities."""
     return np.corrcoef(predictions, intensities)[0, 1]
+
+
+def print_args(args):
+    """
+    Prints all the arguments as a dictionary.
+    
+    Args:
+        args: Namespace object containing configuration and hyperparameters.
+    """
+    args_dict = vars(args)
+    print("Arguments used for this run:")
+    print(args_dict)
