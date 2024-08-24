@@ -149,7 +149,7 @@ def train_model(model, dataset, test_dataset, args):
 
     if args.predict:
         # Load the best model
-        best_model = model.load_from_checkpoint(checkpoint_callback.best_model_path)
+        best_model = model.__class__.load_from_checkpoint(checkpoint_callback.best_model_path)
 
         # Create a test dataset for prediction
         test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
