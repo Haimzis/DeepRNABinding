@@ -22,7 +22,7 @@ def encode_sequence(sequence):
         raise KeyError(f"Unknown nucleotide encountered in sequence: {sequence}")
 
 class BaseRNASequenceDataset(Dataset):
-    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=0):
+    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=False):
         """Initializes the BaseRNASequenceDataset."""
         self.train = train
         self.sequences_file = sequences_file
@@ -57,32 +57,35 @@ class BaseRNASequenceDataset(Dataset):
     def load_train_data(self, trim, negative_examples):
         """Loads training data from htr-selex files for the specified RBP index."""
         htr_selex_files = [os.path.join(self.htr_selex_dir, f'RBP{self.i}_{j}.txt') for j in range(1, 5)]
+        htr_selex_files = [file for file in htr_selex_files if os.path.exists(file)]
         df_list = []
         nrows = 100 if trim else None
+        negative_examples = negative_examples or len(htr_selex_files) == 1
 
         for j, file in enumerate(htr_selex_files, start=1):
-            if os.path.exists(file):
-                df = pd.read_csv(file, header=None, names=['sequence', 'occurrences'], nrows=nrows)
-                df['occurrences'] = df['occurrences'].astype(np.uint8)
-                df['label'] = j - 1
-                df_list.append(df)
+            df = pd.read_csv(file, header=None, names=['sequence', 'occurrences'], nrows=nrows)
+            df['occurrences'] = df['occurrences'].astype(np.uint8)
+            df['label'] = j if negative_examples else j - 1 
+            df_list.append(df)
 
         if not df_list:
             raise FileNotFoundError(f"No htr-selex files found for RBP{self.i}")
 
         combined_df = pd.concat(df_list, ignore_index=True)
 
-        if negative_examples > 0:
+        if negative_examples:
+            # Use anyway if there is a single RBP file. (binary classification)
+            negative_examples_amount = len(combined_df) // len(htr_selex_files)
             neg_examples = [{'sequence': ''.join(np.random.choice(['A', 'C', 'G', 'T'], 40)),
-                             'occurrences': 1, 'label': 0} for _ in range(negative_examples)]
+                             'occurrences': 1, 'label': 0} for _ in range(negative_examples_amount)]
             neg_df = pd.DataFrame(neg_examples)
             combined_df = pd.concat([combined_df, neg_df], ignore_index=True)
 
-        if trim:
-            combined_df = combined_df.head(100)
-
         combined_df['sequence'] = combined_df['sequence'].astype(str)
         combined_df['label'] = combined_df['label'].astype(np.uint8)
+
+        if trim:
+            combined_df = combined_df.head(100)
 
         return combined_df.to_records(index=False)
 
@@ -124,3 +127,9 @@ class BaseRNASequenceDataset(Dataset):
     def is_same_length(self):
         """Checks if all sequences in self.data have the same length."""
         return len(set(len(record['padded_sequence']) for record in self.data)) == 1
+
+    def get_num_classes(self):
+        return len(np.unique(self.data.label))
+    
+    def get_possible_classes(self):
+        return np.unique(self.data.label)

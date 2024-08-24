@@ -7,7 +7,7 @@ from multimolecule import RnaTokenizer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 class RNABERTDataset(BaseRNASequenceDataset):
     def __init__(self, sequences_file: str, intensities_dir: str, htr_selex_dir: str, i: int = 1, train: bool = True,
-                 trim: bool = False, negative_examples: int = 0, max_length: int = 440):
+                 trim: bool = False, negative_examples: bool = False, max_length: int = 440):
         super().__init__(sequences_file, intensities_dir, htr_selex_dir, i, trim, train, negative_examples)
 
         self.max_length = max_length

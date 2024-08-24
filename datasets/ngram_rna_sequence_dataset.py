@@ -7,7 +7,7 @@ from datasets.base_dataset import BaseRNASequenceDataset
 
 
 class NgramRNASequenceDataset(BaseRNASequenceDataset):
-    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=0, n=(4, 7), top_m=2048, binary_embedding=False, vectorizer=None, selector=None):
+    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=False, n=(4, 7), top_m=2048, binary_embedding=False, vectorizer=None, selector=None):
         super().__init__(sequences_file, intensities_dir, htr_selex_dir, i, trim, train, negative_examples)
         self.n = n
         self.top_m = top_m
