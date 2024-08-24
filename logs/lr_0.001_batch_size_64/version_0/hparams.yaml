@@ -1,4 +1,0 @@
-dropout_rate: 0.05
-input_size: 5440
-lr: 0.001
-output_size: 5
