@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 
 
 class DeepSELEX(pl.LightningModule):
-    # TODO: Create additional model for customizations - leave this as a baseline. 
+    # Original DeepSELEX Model.
     def __init__(self, input_size, output_size, lr=0.003):
         """
         Constructor for the DeepSELEX model.

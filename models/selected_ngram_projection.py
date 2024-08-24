@@ -5,7 +5,8 @@ from joblib import Parallel, delayed
 from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
 import optuna
 
-class NgramModel:
+
+class SelectedNGramProjectionModel:
     def __init__(self, htr_selex_dir, sequences_file, intensities_dir, KMer_LEN=(4, 7), top_k=2048, binary_embedding=False, trial=None, n_jobs=-1):
         self.htr_selex_dir = htr_selex_dir
         self.sequences_file = sequences_file

@@ -16,10 +16,10 @@ def main():
     parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
     parser.add_argument('--intensities_dir', type=str, default='data/RNAcompete_intensities', help='Directory containing the intensity levels.')
     parser.add_argument('--htr_selex_dir', type=str, default='data/htr-selex', help='Directory containing the HTR-SELEX documents.')
-    parser.add_argument('--rbp_num', type=int, default=1, help='RBP index number.')
+    parser.add_argument('--rbp_num', type=int, default=28, help='RBP index number.')
     parser.add_argument('--trim', type=bool, default=False, help='Trim the data for faster debugging.')
-    parser.add_argument('--train', type=bool, default=False, help='Load HTR-SELEX or RNACompete sequences.')
-    parser.add_argument('--negative_examples', type=int, default=0, help='Number of negative samples to generate.')
+    parser.add_argument('--train', type=bool, default=True, help='Load HTR-SELEX or RNACompete sequences.')
+    parser.add_argument('--negative_examples', type=bool, default=False, help='Number of negative samples to generate.')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for data loader.')
     args = parser.parse_args()
 
@@ -35,11 +35,13 @@ def main():
 
     train_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
+    print(f'Possible classes values: {dataset.get_possible_classes()}')
     for batch in train_loader:
         sequences, occurrences, labels = batch
         print(f'Sequences batch shape: {sequences.shape}')
         print(f'Occurrences batch shape: {occurrences.shape}')
         print(f'Labels batch shape: {labels.shape}')
+        break
 
 if __name__ == '__main__':
     main()

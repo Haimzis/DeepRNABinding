@@ -91,6 +91,7 @@ def get_min_max_intensities(intensities_dir):
             f.write(f'RBP{i+1}: Min={min_arr[i]}, Max={max_arr[i]}\n')
         f.write(f'Min: {min(min_arr)}\n')
         f.write(f'Max: {max(max_arr)}\n')
+
 def get_intensity_bins(intensities_dir):
     bins = []
     ranges = []
@@ -119,9 +120,13 @@ def get_intensity_bins(intensities_dir):
             f.write(f'RBP{i + 1}: {percentages_str}\n')
             f.write(f'Ranges: {ranges[i]}\n')
 
+def print_args(args):
+    """
+    Prints all the arguments as a dictionary.
 
-def main():
-
-
-if __name__ == '__main__':
-    main()
+    Args:
+        args: Namespace object containing configuration and hyperparameters.
+    """
+    args_dict = vars(args)
+    print("Arguments used for this run:")
+    print(args_dict)

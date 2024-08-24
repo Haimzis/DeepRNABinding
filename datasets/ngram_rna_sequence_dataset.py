@@ -7,13 +7,13 @@ from datasets.base_dataset import BaseRNASequenceDataset
 
 
 class NgramRNASequenceDataset(BaseRNASequenceDataset):
-    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=0, n=(4, 7), top_m=2048, binary_embedding=False, vectorizer=None, selector=None):
+    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=False, n=(4, 7), top_m=2048, binary_embedding=False, vectorizer=None, selector=None):
         super().__init__(sequences_file, intensities_dir, htr_selex_dir, i, trim, train, negative_examples)
         self.n = n
         self.top_m = top_m
         self.binary_embedding = binary_embedding
-        self.vectorizer = vectorizer  # Allow passing in the vectorizer from outside
-        self.selector = selector  # Allow passing in the selector from outside
+        self.vectorizer = vectorizer
+        self.selector = selector
         self.top_indices, self.features = self.extract_and_select_top_ngrams()
 
     def extract_and_select_top_ngrams(self):
