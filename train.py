@@ -38,7 +38,7 @@ parser.add_argument('--lr', type=float, default=0.0001, help='Learning rate for 
 parser.add_argument('--early_stopping', type=int, default=10, help='Number of epochs for early stopping.')
 parser.add_argument('--seed', type=int, default=24, help='Seed for random number generator.')
 parser.add_argument('--trim', type=bool, default=False, help='Whether to trim the data for faster debugging.')
-parser.add_argument('--negative_examples', type=bool, default=False, help='Number of negative samples to generate.')
+parser.add_argument('--negative_examples', type=bool, default=True, help='Number of negative samples to generate.')
 parser.add_argument('--log_dir', type=str, default='logs', help='Directory to save the logs.')
 args = parser.parse_args()
 
@@ -80,15 +80,15 @@ def select_model_and_dataset(args):
 
     # Select model
     if args.model == 'CNNAttention':
-        model = CNNAttention(input_size=train_dataset.get_sequence_length(), num_classes=train_dataset.get_num_classes, lr=args.lr, kernel_size=9, num_filters=2048, attention_dim=512)
+        model = CNNAttention(input_size=train_dataset.get_sequence_length(), num_classes=train_dataset.get_num_classes(), lr=args.lr, kernel_size=9, num_filters=2048, attention_dim=512)
     elif args.model == 'DeepSELEX':
-        model = DeepSELEX(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes, lr=args.lr)
+        model = DeepSELEX(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'NGramDNN':
-        model = NGramDNN(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes, lr=args.lr)
+        model = NGramDNN(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'LSTMSELEX':
-        model = BiDirectionalLSTM(num_classes=train_dataset.get_num_classes, lr=args.lr)
+        model = BiDirectionalLSTM(num_classes=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'RnaBert':
-        model = RnaBert(output_size=train_dataset.get_num_classes, lr=args.lr)
+        model = RnaBert(output_size=train_dataset.get_num_classes(), lr=args.lr)
     else:
         raise ValueError(f"Model {args.model} not recognized.")
 
