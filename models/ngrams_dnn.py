@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
-from torchmetrics.classification import MulticlassAccuracy
 
+from models.base_model import BaseModel
 
-class NGramDNN(pl.LightningModule):
+class NGramDNN(BaseModel):
     def __init__(self, input_size, output_size, lr=0.003, dropout_rate=0.25):
         """
         Constructor for the DeepSELEXDNN model adapted for N-gram features.
@@ -15,10 +14,8 @@ class NGramDNN(pl.LightningModule):
             lr (float): The learning rate for training.
             dropout_rate (float): The dropout rate for regularization.
         """
-        super(NGramDNN, self).__init__()
+        super(NGramDNN, self).__init__(output_size)
         self.save_hyperparameters()
-
-        self.accuracy = MulticlassAccuracy(num_classes=output_size)
 
         self.fc1 = nn.Linear(input_size, 512)
         self.fc2 = nn.Linear(512, 128)
@@ -64,23 +61,24 @@ class NGramDNN(pl.LightningModule):
         X, y = batch  # Assuming X is (N, M) and y is (N,)
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        acc = self.accuracy(outputs, y)
-        self.log('train_loss', loss, prog_bar=True, logger=True)
-        self.log('train_acc', acc, prog_bar=False, logger=True)        
+        preds = torch.argmax(outputs, dim=1)
+        self.log_metrics(loss, preds, y, 'train')
         return loss
 
     def validation_step(self, batch, batch_idx):
+        """
+        Validation step for the model.
+        Args:
+            batch (tuple): A tuple containing the input data and target labels.
+            batch_idx (int): The index of the batch.
+        Returns:
+            torch.Tensor: The loss value for the batch.
+        """
         X, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
         preds = torch.argmax(outputs, dim=1)
-
-        # Update metrics with the current batch
-        acc = self.accuracy(preds, y)
-
-        # Log metrics (accumulated over batches)
-        self.log('val_loss', loss, prog_bar=True, logger=True)
-        self.log('val_acc', acc, prog_bar=False, logger=True)
+        self.log_metrics(loss, preds, y, 'val')
 
     def predict_step(self, batch, batch_idx):
         """

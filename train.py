@@ -33,7 +33,7 @@ parser.add_argument('--predict_output_dir', type=str, default='outputs/predictio
 parser.add_argument('--save_model_file', type=str, default='outputs/models/Deep_SELEX', help='Directory to save the model.')
 parser.add_argument('--load_model_file', type=str, default='outputs/models/Deep_SELEX/best_model.ckpt', help='File to load the model.')
 parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training.')
-parser.add_argument('--epochs', type=int, default=50, help='Number of epochs for training.')
+parser.add_argument('--epochs', type=int, default=1, help='Number of epochs for training.')
 parser.add_argument('--lr', type=float, default=0.0001, help='Learning rate for training.')
 parser.add_argument('--early_stopping', type=int, default=10, help='Number of epochs for early stopping.')
 parser.add_argument('--seed', type=int, default=24, help='Seed for random number generator.')

@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
 
+from models.base_model import BaseModel
 
-class DeepSELEX(pl.LightningModule):
-    # Original DeepSELEX Model.
+class DeepSELEX(BaseModel):
     def __init__(self, input_size, output_size, lr=0.003):
         """
         Constructor for the DeepSELEX model.
@@ -14,7 +13,7 @@ class DeepSELEX(pl.LightningModule):
             output_size (int): The size of the output data.
             lr (float): The learning rate for training.
         """
-        super(DeepSELEX, self).__init__()
+        super(DeepSELEX, self).__init__(output_size)
         self.save_hyperparameters()
         self.conv1 = nn.Conv1d(in_channels=4, out_channels=512, kernel_size=8, stride=1)
         self.pool = nn.MaxPool1d(kernel_size=5, stride=5)
@@ -66,9 +65,6 @@ class DeepSELEX(pl.LightningModule):
         Configure optimizers and learning rate scheduler.
         """
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        # TODO: No need for scheduler when using Adam.
-        # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
-        # return [optimizer], [scheduler]
         return optimizer 
 
     def training_step(self, batch, batch_idx):
@@ -83,7 +79,8 @@ class DeepSELEX(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        self.log('train_loss', loss, prog_bar=True)
+        preds = torch.argmax(outputs, dim=1)
+        self.log_metrics(loss, preds, y, 'train')
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -98,8 +95,8 @@ class DeepSELEX(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        self.log('val_loss', loss)
-        return loss
+        preds = torch.argmax(outputs, dim=1)
+        self.log_metrics(loss, preds, y, 'val')
 
     def predict_step(self, batch, batch_idx):
         """
