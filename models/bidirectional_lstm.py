@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
 
+from models.base_model import BaseModel
 
-class BiDirectionalLSTM(pl.LightningModule):
+class BiDirectionalLSTM(BaseModel):
     def __init__(self, output_size, hidden_dim=128, num_layers=2, lr=0.003):
         """
         Constructor for the LSTM-based DeepSELEX model.
@@ -15,7 +15,7 @@ class BiDirectionalLSTM(pl.LightningModule):
             num_layers (int): The number of LSTM layers.
             lr (float): The learning rate for training.
         """
-        super(BiDirectionalLSTM, self).__init__()
+        super(BiDirectionalLSTM, self).__init__(output_size)
         self.save_hyperparameters()
 
         # LSTM layer
@@ -73,7 +73,8 @@ class BiDirectionalLSTM(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        self.log('train_loss', loss, prog_bar=True)
+        preds = torch.argmax(outputs, dim=1)
+        self.log_metrics(loss, preds, y, 'train')
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -88,8 +89,8 @@ class BiDirectionalLSTM(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        self.log('val_loss', loss)
-        return loss
+        preds = torch.argmax(outputs, dim=1)
+        self.log_metrics(loss, preds, y, 'val')
 
     def predict_step(self, batch, batch_idx):
         """

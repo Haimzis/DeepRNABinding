@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from torchmetrics import AUROC
 from torchmetrics.classification import MulticlassAccuracy
 from multimolecule import RnaBertModel, RnaTokenizer
 
@@ -11,7 +10,6 @@ class RnaBert(pl.LightningModule):
     def __init__(self, output_size, lr=0.003):
         super(RnaBert, self).__init__()
         self.accuracy = MulticlassAccuracy(num_classes=output_size)
-        self.auroc = AUROC(num_classes=output_size, task="multiclass")
 
         self.lr = lr
 

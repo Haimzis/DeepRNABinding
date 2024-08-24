@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
 
+from models.base_model import BaseModel
 
-class CNNAttention(pl.LightningModule):
+class CNNAttention(BaseModel):
     def __init__(self, input_size, num_classes, lr=0.003, num_filters=32, kernel_size=3, attention_dim=32):
         """
         Constructor for the CNNAttentionLightning model.
@@ -16,14 +16,15 @@ class CNNAttention(pl.LightningModule):
             filter_size (int): The size of the convolution filter.
             attention_dim (int): The size of the attention layer.
         """
-        super(CNNAttention, self).__init__()
+        super(CNNAttention, self).__init__(num_classes)
         self.save_hyperparameters()
         
         self.conv = nn.Conv1d(in_channels=4, out_channels=num_filters, kernel_size=kernel_size)
+        self.batch_norm = nn.BatchNorm1d(num_filters)  # Add Batch Normalization layer
         self.attention = nn.Linear(num_filters, attention_dim)
         self.context_vector = nn.Linear(attention_dim, 1, bias=False)
         self.fc = nn.Linear(num_filters, num_classes)
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.3)
         self.lr = lr
 
     def forward(self, x):
@@ -35,7 +36,7 @@ class CNNAttention(pl.LightningModule):
             torch.Tensor: The output data.
         """
         x = x.permute(0, 2, 1)  # Shape: (batch_size, 4, seq_length)
-        conv_output = F.relu(self.conv(x))  # Shape: (batch_size, num_filters, new_seq_length)
+        conv_output = F.relu(self.batch_norm(self.conv(x))) 
         conv_output = conv_output.permute(0, 2, 1)  # Shape: (batch_size, new_seq_length, num_filters)
 
         attention_scores = torch.tanh(self.attention(conv_output))  # Shape: (batch_size, new_seq_length, attention_dim)
@@ -64,7 +65,8 @@ class CNNAttention(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        self.log('train_loss', loss, prog_bar=True)
+        preds = torch.argmax(outputs, dim=1)
+        self.log_metrics(loss, preds, y, 'train')
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -79,8 +81,8 @@ class CNNAttention(pl.LightningModule):
         X, _, y = batch
         outputs = self(X)
         loss = F.cross_entropy(outputs, y)
-        self.log('val_loss', loss)
-        return loss
+        preds = torch.argmax(outputs, dim=1)
+        self.log_metrics(loss, preds, y, 'val')
 
     def predict_step(self, batch, batch_idx):
         """
