@@ -86,7 +86,7 @@ def get_min_max_intensities(intensities_dir):
             intensities.append(pd.read_csv(intensities_file, header=None).values.flatten())
             max_arr.append(np.max(intensities[-1]))
             min_arr.append(np.min(intensities[-1]))
-    with open('min_max_intensities.txt', 'w') as f:
+    with open('data/min_max_intensities.txt', 'w') as f:
         for i in range(38):
             f.write(f'RBP{i+1}: Min={min_arr[i]}, Max={max_arr[i]}\n')
         f.write(f'Min: {min(min_arr)}\n')
@@ -109,7 +109,7 @@ def get_intensity_bins(intensities_dir):
                 class_info.append((class_range, count))
             bins.append(hist)
             ranges.append(class_info)
-    with open('intensity_bins.txt', 'w') as f:
+    with open('data/intensity_bins.txt', 'w') as f:
         for i in range(38):
             f.write(f'RBP{i+1}: {bins[i]}\n')
             # Calculate the percentage for each element in bins[i]

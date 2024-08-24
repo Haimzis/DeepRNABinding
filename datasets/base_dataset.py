@@ -58,7 +58,7 @@ class BaseRNASequenceDataset(Dataset):
         else:
             return self.load_test_data(trim)
 
-    def load_train_data(self, trim, negative_examples):
+    def load_train_data(self, trim, negative_examples, gen_example_choice='RANDOM'):
         """Loads training data from htr-selex files for the specified RBP index."""
         htr_selex_files = [os.path.join(self.htr_selex_dir, f'RBP{self.i}_{j}.txt') for j in range(1, 5)]
         htr_selex_files = [file for file in htr_selex_files if os.path.exists(file)]
@@ -80,9 +80,14 @@ class BaseRNASequenceDataset(Dataset):
         if negative_examples:
             # Use anyway if there is a single RBP file. (binary classification)
             negative_examples_amount = len(combined_df) // len(htr_selex_files)
-            neg_examples = [{'sequence': ''.join(np.random.choice(['A', 'C', 'G', 'T'], 40)),
-                             'occurrences': 1, 'label': 0} for _ in range(negative_examples_amount)]
-            neg_df = pd.DataFrame(neg_examples)
+            if gen_example_choice == 'RANDOM':
+                neg_examples = [{'sequence': ''.join(np.random.choice(['A', 'C', 'G', 'T'], 40)),
+                                 'occurrences': 1, 'label': 0} for _ in range(negative_examples_amount)]
+                neg_df = pd.DataFrame(neg_examples)
+            elif gen_example_choice == 'FROM_CYCLE_1':
+                neg_df = pd.DataFrame(self.get_negative_examples_by_other_cycle_1(negative_examples_amount))
+            elif gen_example_choice == 'MARKOV':
+                neg_df = pd.DataFrame(self.get_negative_examples_by_markov_chain(negative_examples_amount))
             combined_df = pd.concat([combined_df, neg_df], ignore_index=True)
 
         combined_df['sequence'] = combined_df['sequence'].astype(str)
