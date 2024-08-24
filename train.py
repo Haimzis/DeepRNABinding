@@ -80,13 +80,13 @@ def select_model_and_dataset(args):
 
     # Select model
     if args.model == 'CNNAttention':
-        model = CNNAttention(input_size=train_dataset.get_sequence_length(), num_classes=train_dataset.get_num_classes(), lr=args.lr, kernel_size=9, num_filters=2048, attention_dim=512)
+        model = CNNAttention(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr, kernel_size=9, num_filters=2048, attention_dim=512)
     elif args.model == 'DeepSELEX':
         model = DeepSELEX(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'NGramDNN':
         model = NGramDNN(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'LSTMSELEX':
-        model = BiDirectionalLSTM(num_classes=train_dataset.get_num_classes(), lr=args.lr)
+        model = BiDirectionalLSTM(output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'RnaBert':
         model = RnaBert(output_size=train_dataset.get_num_classes(), lr=args.lr)
     else:

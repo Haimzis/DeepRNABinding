@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from models.base_model import BaseModel
 
 class CNNAttention(BaseModel):
-    def __init__(self, input_size, num_classes, lr=0.003, num_filters=32, kernel_size=3, attention_dim=32):
+    def __init__(self, input_size, output_size, lr=0.003, num_filters=32, kernel_size=3, attention_dim=32):
         """
         Constructor for the CNNAttentionLightning model.
         Args:
@@ -16,14 +16,14 @@ class CNNAttention(BaseModel):
             filter_size (int): The size of the convolution filter.
             attention_dim (int): The size of the attention layer.
         """
-        super(CNNAttention, self).__init__(num_classes)
+        super(CNNAttention, self).__init__(output_size)
         self.save_hyperparameters()
         
         self.conv = nn.Conv1d(in_channels=4, out_channels=num_filters, kernel_size=kernel_size)
         self.batch_norm = nn.BatchNorm1d(num_filters)  # Add Batch Normalization layer
         self.attention = nn.Linear(num_filters, attention_dim)
         self.context_vector = nn.Linear(attention_dim, 1, bias=False)
-        self.fc = nn.Linear(num_filters, num_classes)
+        self.fc = nn.Linear(num_filters, output_size)
         self.dropout = nn.Dropout(0.3)
         self.lr = lr
 
