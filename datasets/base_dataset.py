@@ -1,4 +1,7 @@
 import os
+from collections import defaultdict
+from random import random, choices, choice
+
 import pandas as pd
 import numpy as np
 import torch
@@ -13,6 +16,7 @@ nucleotide_to_onehot = {
     'T': [0, 0, 0, 1],
     'N': [0.25, 0.25, 0.25, 0.25]
 }
+negative_examples_gen = {'RANDOM': 0, 'FROM_CYCLE_1': 1, 'MARKOV': 2}
 
 def encode_sequence(sequence):
     """Encodes a nucleotide sequence into a one-hot encoded format."""
@@ -126,10 +130,133 @@ class BaseRNASequenceDataset(Dataset):
     
     def is_same_length(self):
         """Checks if all sequences in self.data have the same length."""
-        return len(set(len(record['padded_sequence']) for record in self.data)) == 1
+        return len(set(len(record['sequence']) for record in self.data)) == 1
 
     def get_num_classes(self):
         return len(np.unique(self.data.label))
     
     def get_possible_classes(self):
         return np.unique(self.data.label)
+
+    def get_negative_examples_by_other_cycle_1(self, negative_examples):
+        """
+        The First method suggested to generate negative examples:
+        In a case where RBP{self.i}_1.txt in htr-selex_dir is missing, this function will return negative examples
+        based on all other sequences of RBP{j}_1.txt where j != self.i.
+        this method sample #negative_examples from the sequences of RBP{j}_1.txt where j != self.i.
+        Returns: a list of negative examples
+        """
+        if not hasattr(self, 'cycle_1_sequences'):
+            self.load_cycle_1_sequences()
+
+        # Convert to pandas DataFrame for easier manipulation
+        df = pd.DataFrame(self.cycle_1_sequences)
+
+        # Unpack sequences and occurrences
+        sequences = df['sequence'].values
+        occurrences = df['occurrences'].values
+
+        # Normalize the occurrences to avoid overflow
+        total_occurrences = sum(occurrences)
+        normalized_weights = [occ / total_occurrences for occ in occurrences]
+
+        # Sample sequences based on normalized weights
+        sampled_indices = choices(range(len(sequences)), weights=normalized_weights, k=negative_examples)
+        sampled_sequences = [sequences[i] for i in sampled_indices]
+
+        # Create a structured array
+        neg_examples = np.array([(seq, 1, 0) for seq in sampled_sequences],
+                                dtype=[('sequence', 'U40'), ('occurrences', 'u1'), ('label', 'u1')])
+
+        return neg_examples
+
+    def load_cycle_1_sequences(self):
+        """Load sequences from Cycle 1 files and aggregate occurrences and labels."""
+        self.cycle_1_sequences = []
+        htr_selex_files = [os.path.join(self.htr_selex_dir, f'RBP{i}_1.txt') for i in range(1, 39)]
+        htr_selex_files = [file for file in htr_selex_files if os.path.exists(file)]
+        df_list = []
+
+        for file in htr_selex_files:
+            df = pd.read_csv(file, header=None, names=['sequence', 'occurrences'])
+            df['occurrences'] = df['occurrences'].astype(np.uint8)
+            df['label'] = 1
+            df_list.append(df)
+
+        if not df_list:
+            raise FileNotFoundError("No sequences found in htr-selex files")
+
+        combined_df = pd.concat(df_list, ignore_index=True)
+
+        # Group by sequence and aggregate occurrences and max label
+        max_labels = combined_df.groupby('sequence').agg({
+            'occurrences': 'sum',
+            'label': 'max'
+        }).reset_index()
+
+        # Convert to records format and store in cycle_1_sequences
+        self.cycle_1_sequences = max_labels.to_records(index=False)
+
+    def get_negative_examples_by_markov_chain(self, negative_examples, order=1):
+        """
+        Generate negative examples using a highly optimized Markov chain model.
+
+        Args:
+        negative_examples (int): Number of negative examples to generate.
+        order (int): The order of the Markov chain. Default is 1.
+
+        Returns:
+        numpy.recarray: A record array of negative examples.
+        """
+        if not hasattr(self, 'cycle_1_sequences'):
+            self.load_cycle_1_sequences()
+        if not hasattr(self, 'markov_chain'):
+            self.build_markov_chain(order)
+
+        # Generate new sequences
+        new_sequences = []
+        for _ in range(negative_examples):
+            new_seq = ''.join(choice('ACGT') for _ in range(order))
+            while len(new_seq) < 40:  # Assuming sequences are 40 nucleotides long
+                state = new_seq[-order:] if len(new_seq) >= order else new_seq
+                next_char = self.markov_chain[state].generate()
+                new_seq += next_char
+
+            new_sequences.append(new_seq)
+
+        # Create a structured array directly
+        return np.array([(seq, 1, 0) for seq in new_sequences],
+                        dtype=[('sequence', 'U40'), ('occurrences', 'u1'), ('label', 'u1')])
+
+    def build_markov_chain(self, order):
+        """
+        Build and cache the Markov chain.
+        """
+        chain = defaultdict(lambda: MarkovState())
+        for seq in self.cycle_1_sequences['sequence']:
+            for i in range(len(seq) - order):
+                state = seq[i:i + order]
+                next_char = seq[i + order]
+                chain[state].add(next_char)
+        self.markov_chain = chain
+
+class MarkovState:
+    def __init__(self):
+        self.counts = {'A': 0, 'C': 0, 'G': 0, 'T': 0}
+        self.total = 0
+
+    def add(self, char):
+        if char == 'N':
+            return
+        self.counts[char] += 1
+        self.total += 1
+
+    def generate(self):
+        if self.total == 0:
+            return choice('ACGT')  # Use fallback directly if total is zero
+        r = random() * self.total
+        for char, count in self.counts.items():
+            r -= count
+            if r <= 0:
+                return char
+        return choice('ACGT')  # Fallback, should rarely happen
