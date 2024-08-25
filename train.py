@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, Subset
 from utils import print_args, save_predictions
 
 # Import datasets and models
+from datasets.rna_sequence_dataset_deepselex import RNASequenceDatasetDeepSelex
 from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
 from datasets.rna_sequence_dataset import RNASequenceDataset
 from datasets.rnabert_dataset import RNABERTDataset
@@ -57,7 +58,16 @@ def select_model_and_dataset(args):
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
             args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, vectorizer=train_dataset.vectorizer, selector=train_dataset.selector
         )
-    elif args.model in ['CNNAttention', 'DeepSELEX', 'LSTMSELEX']:
+    elif args.model in ['DeepSELEX']:
+        train_dataset = RNASequenceDatasetDeepSelex(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
+        )
+        test_dataset = RNASequenceDatasetDeepSelex(
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples
+        )
+    elif args.model in ['CNNAttention', 'LSTMSELEX']:
         train_dataset = RNASequenceDataset(
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
             args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
@@ -82,7 +92,7 @@ def select_model_and_dataset(args):
     if args.model == 'CNNAttention':
         model = CNNAttention(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr, kernel_size=9, num_filters=2048, attention_dim=512)
     elif args.model == 'DeepSELEX':
-        model = DeepSELEX(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
+        model = DeepSELEX(seq_size=train_dataset.get_sequence_length(), k=train_dataset.get_k(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'NGramDNN':
         model = NGramDNN(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'LSTMSELEX':
@@ -168,8 +178,25 @@ if __name__ == '__main__':
     # Set the seed for reproducibility
     pl.seed_everything(args.seed)
     log.basicConfig(level=log.INFO)
+    args = argparse.Namespace(rbp_num=1,
+                              model='DeepSELEX',
+                              predict=True,
+                              sequences_file='data/RNAcompete_sequences_rc.txt',
+                              intensities_dir='data/RNAcompete_intensities',
+                              htr_selex_dir='data/htr-selex',
+                              predict_output_dir='outputs/predictions/DeepSELEX',
+                              save_model_file='outputs/models/DeepSELEX.pth',
+                              load_model_file='outputs/models/DeepSELEX.pth',
+                              batch_size=64,
+                              epochs=100,
+                              lr=0.001,
+                              early_stopping=5,
+                              seed=32,
+                              kfold=10,
+                              trim=False,
+                              negative_examples=5000,
+                              log_dir='outputs/logs/DeepSELEX')
     print_args(args)
-
     try:
         # Select model, training dataset, and test dataset
         model, train_dataset, test_dataset = select_model_and_dataset(args)
