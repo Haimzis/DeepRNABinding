@@ -84,8 +84,7 @@ class DeepSELEX(BaseModel):
         # Calculate loss using raw logits (not argmax)
         loss = F.cross_entropy(outputs.reshape(-1, self.output_size), y.reshape(-1))
         # Predictions: take the argmax after calculating loss
-        preds = torch.argmax(outputs, dim=2)
-        self.log_metrics(loss, preds, y, 'train')
+        self.log(f'train_loss', loss, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -106,9 +105,7 @@ class DeepSELEX(BaseModel):
 
         # Calculate loss using raw logits (not argmax)
         loss = F.cross_entropy(outputs.reshape(-1, self.output_size), y.reshape(-1))
-        # Predictions: take the argmax after calculating loss
-        preds = torch.argmax(outputs, dim=2)
-        self.log_metrics(loss, preds, y, 'val')
+        self.log(f'val_loss', loss, prog_bar=True, logger=True)
 
     def predict_step(self, batch, batch_idx):
         """
@@ -125,7 +122,10 @@ class DeepSELEX(BaseModel):
         # Get predictions from the model
         prediction = self(X)  # Prediction shape: (batch_size, sub_seq, output_size)
 
-        # Extract relevant columns (assuming `output_size` >= 4)
+        if self.output_size == 2:  # in case output_size <= 2
+            max_last = torch.max(prediction[:, :, -1], dim=1)[0]  # Max over sub_seq for last output
+            min_first_0 = torch.min(prediction[:, :, 0], dim=1)[0]  # Min over sub_seq for the first output
+            return max_last - min_first_0
         max_last_4 = torch.max(prediction[:, :, -1], dim=1)[0]  # Max over sub_seq for last output
         max_last_3 = torch.max(prediction[:, :, -2], dim=1)[0]  # Max over sub_seq for second last output
         min_first_0 = torch.min(prediction[:, :, 0], dim=1)[0]  # Min over sub_seq for the first output

@@ -61,7 +61,7 @@ def select_model_and_dataset(args):
     elif args.model in ['DeepSELEX']:
         train_dataset = RNASequenceDatasetDeepSelex(
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
+            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, k=14
         )
         test_dataset = RNASequenceDatasetDeepSelex(
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
@@ -178,24 +178,7 @@ if __name__ == '__main__':
     # Set the seed for reproducibility
     pl.seed_everything(args.seed)
     log.basicConfig(level=log.INFO)
-    args = argparse.Namespace(rbp_num=1,
-                              model='DeepSELEX',
-                              predict=True,
-                              sequences_file='data/RNAcompete_sequences_rc.txt',
-                              intensities_dir='data/RNAcompete_intensities',
-                              htr_selex_dir='data/htr-selex',
-                              predict_output_dir='outputs/predictions/DeepSELEX',
-                              save_model_file='outputs/models/DeepSELEX.pth',
-                              load_model_file='outputs/models/DeepSELEX.pth',
-                              batch_size=64,
-                              epochs=100,
-                              lr=0.001,
-                              early_stopping=5,
-                              seed=32,
-                              kfold=10,
-                              trim=False,
-                              negative_examples=5000,
-                              log_dir='outputs/logs/DeepSELEX')
+    
     print_args(args)
     try:
         # Select model, training dataset, and test dataset

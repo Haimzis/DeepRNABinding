@@ -1,21 +1,13 @@
 # rna_sequence_dataset.py
 import torch
 import pandas as pd
-from datasets.base_dataset import BaseRNASequenceDataset, encode_sequence
+from datasets.rna_sequence_dataset import RNASequenceDataset, encode_sequence
 
 
-class RNASequenceDatasetDeepSelex(BaseRNASequenceDataset):
+class RNASequenceDatasetDeepSelex(RNASequenceDataset):
     def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=False, k=14):
         super().__init__(sequences_file, intensities_dir, htr_selex_dir, i, trim, train, negative_examples)
         self.k = k
-    def process_data(self):
-        """Processes the loaded data to get maximum labels for each sequence."""
-        df = pd.DataFrame(self.data)
-        max_labels = df.groupby('sequence').agg({
-            'occurrences': 'sum',
-            'label': 'max'
-        }).reset_index()
-        self.data = max_labels.to_records(index=False)
 
     def __getitem__(self, idx):
         record = self.data[idx]
