@@ -67,7 +67,7 @@ def select_model_and_dataset(args):
         )
         test_dataset = RNASequenceDatasetDeepSelex(
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples
+            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, k=args.k
         )
     elif args.model in ['CNNAttention', 'LSTMSELEX']:
         train_dataset = RNASequenceDataset(
@@ -152,7 +152,7 @@ def train_model(model, dataset, test_dataset, args):
         logger=logger,
         devices=[0],
         num_sanity_val_steps=0,
-        enable_progress_bar=False
+        enable_progress_bar=True
     )
 
     # Train the model
