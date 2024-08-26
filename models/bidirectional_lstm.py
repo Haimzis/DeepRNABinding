@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from models.base_model import BaseModel
 
 class BiDirectionalLSTM(BaseModel):
-    def __init__(self, output_size, hidden_dim=128, num_layers=2, lr=0.003):
+    def __init__(self, output_size, hidden_dim=256, num_layers=1, lr=0.003, bidirectional=False, dropout_rate=0.5):
         """
         Constructor for the LSTM-based DeepSELEX model.
         Args:
@@ -14,22 +14,33 @@ class BiDirectionalLSTM(BaseModel):
             hidden_dim (int): The number of hidden units in each LSTM layer.
             num_layers (int): The number of LSTM layers.
             lr (float): The learning rate for training.
+            dropout_rate (float): Dropout rate to be applied after each fully connected layer and LSTM layers.
         """
         super(BiDirectionalLSTM, self).__init__(output_size)
         self.save_hyperparameters()
 
-        # LSTM layer
+        self.bidirectional = bidirectional
+
+        # LSTM layer with dropout
         self.lstm = nn.LSTM(
             input_size=4,  # Since input is one-hot encoded with 4 features per nucleotide
             hidden_size=hidden_dim,
             num_layers=num_layers,
             batch_first=True,
-            bidirectional=True  # Using bidirectional LSTM
+            bidirectional=bidirectional,
+            dropout=dropout_rate if num_layers > 1 else 0.0  # Apply dropout only if num_layers > 1
         )
 
-        # Fully connected layers
-        self.fc1 = nn.Linear(hidden_dim * 2, 64)  # *2 because of bidirectionality
+        # Adjust the input size of fc1 based on bidirectionality
+        fc1_input_dim = hidden_dim * 2 if bidirectional else hidden_dim
+        self.fc1 = nn.Linear(fc1_input_dim, 64)
+        self.bn1 = nn.BatchNorm1d(64)
+        self.dropout1 = nn.Dropout(dropout_rate)
+        
         self.fc2 = nn.Linear(64, 32)
+        self.bn2 = nn.BatchNorm1d(32)
+        self.dropout2 = nn.Dropout(dropout_rate)
+        
         self.fc3 = nn.Linear(32, output_size)
 
         self.lr = lr
@@ -43,14 +54,16 @@ class BiDirectionalLSTM(BaseModel):
             torch.Tensor: The output data.
         """
         # LSTM forward pass
-        lstm_out, _ = self.lstm(x)  # lstm_out shape: (batch_size, seq_len, hidden_dim * 2)
+        lstm_out, _ = self.lstm(x)
 
         # Use the output from the last time step
         lstm_out = lstm_out[:, -1, :]
 
-        # Pass through fully connected layers
-        x = F.relu(self.fc1(lstm_out))
-        x = F.relu(self.fc2(x))
+        # Pass through fully connected layers with batch norm and dropout
+        x = F.relu(self.bn1(self.fc1(lstm_out)))
+        x = self.dropout1(x)
+        x = F.relu(self.bn2(self.fc2(x)))
+        x = self.dropout2(x)
         x = self.fc3(x)
         return x
 

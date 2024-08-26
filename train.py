@@ -24,7 +24,7 @@ from models.rna_bert import RnaBert
 
 # Argument parsing
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default='CNNAttention', help='Model to use: CNNAttention, DeepSELEX, LSTMSELEX, RnaBert, NGramDNN')
+parser.add_argument('--model', type=str, default='LSTMSELEX', help='Model to use: CNNAttention, DeepSELEX, LSTMSELEX, RnaBert, NGramDNN')
 parser.add_argument('--rbp_num', type=int, default=1, help='The number of the RNA binding protein to predict.')
 parser.add_argument('--predict', type=bool, default=True, help='Predict the intensity levels.')
 parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
@@ -33,14 +33,16 @@ parser.add_argument('--htr_selex_dir', type=str, default='data/htr-selex', help=
 parser.add_argument('--predict_output_dir', type=str, default='outputs/predictions/Deep_SELEX', help='Directory to save the predictions.')
 parser.add_argument('--save_model_file', type=str, default='outputs/models/Deep_SELEX', help='Directory to save the model.')
 parser.add_argument('--load_model_file', type=str, default='outputs/models/Deep_SELEX/best_model.ckpt', help='File to load the model.')
-parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training.')
-parser.add_argument('--epochs', type=int, default=1, help='Number of epochs for training.')
+parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
+parser.add_argument('--epochs', type=int, default=30, help='Number of epochs for training.')
 parser.add_argument('--lr', type=float, default=0.0001, help='Learning rate for training.')
-parser.add_argument('--early_stopping', type=int, default=10, help='Number of epochs for early stopping.')
+parser.add_argument('--early_stopping', type=int, default=3, help='Number of epochs for early stopping.')
 parser.add_argument('--seed', type=int, default=24, help='Seed for random number generator.')
 parser.add_argument('--trim', type=bool, default=False, help='Whether to trim the data for faster debugging.')
-parser.add_argument('--negative_examples', type=bool, default=True, help='Number of negative samples to generate.')
+parser.add_argument('--negative_examples', type=bool, default=False, help='Number of negative samples to generate.')
 parser.add_argument('--log_dir', type=str, default='logs', help='Directory to save the logs.')
+parser.add_argument('--k', type=int, default=14, help='DeepSelex k value')
+
 args = parser.parse_args()
 
 
@@ -61,7 +63,7 @@ def select_model_and_dataset(args):
     elif args.model in ['DeepSELEX']:
         train_dataset = RNASequenceDatasetDeepSelex(
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, k=14
+            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, k=args.k
         )
         test_dataset = RNASequenceDatasetDeepSelex(
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
@@ -96,7 +98,7 @@ def select_model_and_dataset(args):
     elif args.model == 'NGramDNN':
         model = NGramDNN(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'LSTMSELEX':
-        model = BiDirectionalLSTM(output_size=train_dataset.get_num_classes(), lr=args.lr)
+        model = BiDirectionalLSTM(output_size=train_dataset.get_num_classes(), lr=args.lr, hidden_dim=128, num_layers=2, bidirectional=False, dropout_rate=0.3)
     elif args.model == 'RnaBert':
         model = RnaBert(output_size=train_dataset.get_num_classes(), lr=args.lr)
     else:
@@ -150,6 +152,7 @@ def train_model(model, dataset, test_dataset, args):
         logger=logger,
         devices=[0],
         num_sanity_val_steps=0,
+        enable_progress_bar=False
     )
 
     # Train the model
