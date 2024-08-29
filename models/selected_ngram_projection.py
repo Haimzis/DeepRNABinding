@@ -3,11 +3,10 @@ import numpy as np
 from scipy.stats import pearsonr
 from joblib import Parallel, delayed
 from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
-import optuna
 
 
 class SelectedNGramProjectionModel:
-    def __init__(self, htr_selex_dir, sequences_file, intensities_dir, KMer_LEN=(4, 7), top_k=2048, binary_embedding=False, trial=None, n_jobs=-1):
+    def __init__(self, htr_selex_dir, sequences_file, intensities_dir, KMer_LEN=(4, 7), top_k=2048, binary_embedding=False, n_jobs=-1):
         self.htr_selex_dir = htr_selex_dir
         self.sequences_file = sequences_file
         self.intensities_dir = intensities_dir
@@ -16,27 +15,30 @@ class SelectedNGramProjectionModel:
         self.binary_embedding = binary_embedding
         self.vectorizer = None
         self.selector = None
-        self.trial = trial
         self.n_jobs = n_jobs
 
-    def run(self, num_rbps=38):
-        correlations = Parallel(n_jobs=self.n_jobs)(delayed(self.process_rbp)(i) for i in range(num_rbps))
+    def run(self, htr_selex_files):
+        return self.process_rbp(htr_selex_files=htr_selex_files)
+        
+    def run_all(self, num_rbps=38):
+        intensities = Parallel(n_jobs=self.n_jobs)(delayed(self.process_rbp)(rbp_id=rbp_id+1) for rbp_id in range(num_rbps))
 
-        with open('ngram_correlations.txt', 'w') as file:
-            for correlation in correlations:
-                file.write(f'{correlation}\n')
+        if self.intensities_dir:
+            correlations = []
+            for i, intensity in enumerate(intensities, start=1):
+                binding_intensities_path = os.path.join(self.intensities_dir, f'RBP{i}.txt')
+                correlations.append(self.compute_correlation(intensity, binding_intensities_path))
 
-        print(f"Correlations saved to 'ngram_correlations.txt'")
-        return correlations
+            return correlations
+        return intensities
 
-    def process_rbp(self, i):
-        binding_intensities_path = os.path.join(self.intensities_dir, f'RBP{i + 1}.txt')
-
+    def process_rbp(self, rbp_id=None, htr_selex_files=None):
         train_dataset = NgramRNASequenceDataset(
             sequences_file=self.sequences_file,
             intensities_dir=self.intensities_dir,
             htr_selex_dir=self.htr_selex_dir,
-            i=i + 1,
+            htr_selex_files=htr_selex_files,
+            rbp_num=rbp_id,
             trim=False,
             train=True,
             n=self.kmer_length,
@@ -48,7 +50,8 @@ class SelectedNGramProjectionModel:
             sequences_file=self.sequences_file,
             intensities_dir=self.intensities_dir,
             htr_selex_dir=self.htr_selex_dir,
-            i=i + 1,
+            htr_selex_files=htr_selex_files,
+            rbp_num=rbp_id,
             trim=False,
             train=False,
             n=self.kmer_length,
@@ -59,17 +62,9 @@ class SelectedNGramProjectionModel:
         )
 
         htr_proj_vector = train_dataset.features.sum(axis=0).A.squeeze()
-        rna_score = test_dataset.features.dot(htr_proj_vector)
-        correlation = self.compute_correlation(rna_score, binding_intensities_path)
+        rna_scores = test_dataset.features.dot(htr_proj_vector)
 
-        if self.trial is not None:
-            self.trial.report(np.array(correlation), i)
-
-            if self.trial.should_prune():
-                raise optuna.TrialPruned()
-
-        print(f"Correlation for RBP{i + 1}: {correlation}")
-        return correlation
+        return rna_scores
 
     def compute_correlation(self, rna_score, binding_intensities_path):
         # Load ground truth binding intensities

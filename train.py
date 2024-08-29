@@ -15,17 +15,17 @@ from utils import print_args, save_predictions
 from datasets.rna_sequence_dataset_deepselex import RNASequenceDatasetDeepSelex
 from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
 from datasets.rna_sequence_dataset import RNASequenceDataset
-from datasets.rnabert_dataset import RNABERTDataset
 from models.cnn_attention import CNNAttention
 from models.ngrams_dnn import NGramDNN
 from models.bidirectional_lstm import BiDirectionalLSTM
 from models.deepselex import DeepSELEX
-from models.rna_bert import RnaBert
+
 
 # Argument parsing
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default='LSTMSELEX', help='Model to use: CNNAttention, DeepSELEX, LSTMSELEX, RnaBert, NGramDNN')
-parser.add_argument('--rbp_num', type=int, default=1, help='The number of the RNA binding protein to predict.')
+parser.add_argument('--model', type=str, default='LSTMSELEX', help='Model to use: CNNAttention, DeepSELEX, LSTMSELEX, NGramDNN')
+parser.add_argument('--rbp_num', type=int, default=None, help='The number of the RNA binding protein to predict.')
+parser.add_argument('--htr_selex_files', type='+', default=None, help='Sequence of RBP\'s files')
 parser.add_argument('--predict', type=bool, default=True, help='Predict the intensity levels.')
 parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
 parser.add_argument('--intensities_dir', type=str, default='data/RNAcompete_intensities', help='Directory containing the intensity levels.')
@@ -53,12 +53,12 @@ def select_model_and_dataset(args):
     # Select training and test dataset
     if args.model in ['NGramDNN']:
         train_dataset = NgramRNASequenceDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, n=(7, 9), binary_embedding=False, top_m=1024
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num,
+            args.htr_selex_files, trim=args.trim, train=True, negative_examples=args.negative_examples, n=(7, 9), binary_embedding=False, top_m=1024
         )
         test_dataset = NgramRNASequenceDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, vectorizer=train_dataset.vectorizer, selector=train_dataset.selector
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num,
+            args.htr_selex_files, trim=args.trim, train=False, negative_examples=args.negative_examples, vectorizer=train_dataset.vectorizer, selector=train_dataset.selector
         )
     elif args.model in ['DeepSELEX']:
         train_dataset = RNASequenceDatasetDeepSelex(
@@ -78,15 +78,6 @@ def select_model_and_dataset(args):
             args.sequences_file, args.intensities_dir, args.htr_selex_dir,
             args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples
         )
-    elif args.model in ['RnaBert']:
-        train_dataset = RNABERTDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, max_length=41
-        )
-        test_dataset = RNABERTDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
-            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, max_length=41
-        )
     else:
         raise ValueError(f"Dataset {args.dataset} not recognized.")
 
@@ -99,8 +90,6 @@ def select_model_and_dataset(args):
         model = NGramDNN(input_size=train_dataset.get_sequence_length(), output_size=train_dataset.get_num_classes(), lr=args.lr)
     elif args.model == 'LSTMSELEX':
         model = BiDirectionalLSTM(output_size=train_dataset.get_num_classes(), lr=args.lr, hidden_dim=128, num_layers=2, bidirectional=False, dropout_rate=0.3)
-    elif args.model == 'RnaBert':
-        model = RnaBert(output_size=train_dataset.get_num_classes(), lr=args.lr)
     else:
         raise ValueError(f"Model {args.model} not recognized.")
 

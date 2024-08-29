@@ -27,7 +27,7 @@ def main():
         sequences_file=args.sequences_file,
         intensities_dir=args.intensities_dir,
         htr_selex_dir=args.htr_selex_dir,
-        i=args.rbp_num,
+        num_rbp=args.rbp_num,
         trim=args.trim,
         train=args.train,
         negative_examples=args.negative_examples

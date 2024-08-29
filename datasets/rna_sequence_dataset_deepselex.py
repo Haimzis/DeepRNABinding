@@ -5,8 +5,8 @@ from datasets.rna_sequence_dataset import RNASequenceDataset, encode_sequence
 
 
 class RNASequenceDatasetDeepSelex(RNASequenceDataset):
-    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, i=1, trim=False, train=True, negative_examples=False, k=14):
-        super().__init__(sequences_file, intensities_dir, htr_selex_dir, i, trim, train, negative_examples)
+    def __init__(self, sequences_file, intensities_dir, htr_selex_dir, htr_selex_files=None, i=1, trim=False, train=True, negative_examples=False, k=14):
+        super().__init__(sequences_file, intensities_dir, htr_selex_dir, htr_selex_files, i, trim, train, negative_examples)
         self.k = k
 
     def __getitem__(self, idx):

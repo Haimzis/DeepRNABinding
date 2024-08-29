@@ -31,7 +31,7 @@ def objective(trial):
     )
 
     # Compute correlations (average correlation across all RBPs)
-    correlations = rbp_model.run(num_rbps=args.rbp_num)
+    correlations = rbp_model.run_all(num_rbps=args.rbp_num)
     avg_correlation = sum(correlations) / len(correlations)
 
     # Log the hyperparameters and results
