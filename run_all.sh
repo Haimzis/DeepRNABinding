@@ -4,8 +4,13 @@
 SEQUENCES_FILE="RNAcompete_sequences_rc.txt"
 HTR_SELEX_DIR="data/htr-selex"
 PYTHON_SCRIPT="main.py"
+OUTPUT_DIR="output"
+COMBINED_FILE="combined_correlations.txt"
 
 export PYTHONUNBUFFERED=1
+
+# Create output directory if it doesn't exist
+mkdir -p $OUTPUT_DIR
 
 # Function to process a single RBP
 process_rbp() {
@@ -16,7 +21,6 @@ process_rbp() {
     for CYCLE in {1..4}; do
         FILE="${HTR_SELEX_DIR}/RBP${RBP_NUM}_${CYCLE}.txt"
         if [ -f "$FILE" ]; then
-            # Use basename to extract just the filename
             FILENAME=$(basename "$FILE")
             HTR_SELEX_FILES+=("$FILENAME")
         fi
@@ -33,7 +37,7 @@ process_rbp() {
         echo "Running command: $CMD"
         
         # Run the command and redirect output to a log file
-        $CMD > "output_RBP${RBP_NUM}.log" 2>&1 &
+        $CMD > "${OUTPUT_DIR}/output_RBP${RBP_NUM}.log" 2>&1 &
     else
         echo "No files found for RBP${RBP_NUM}. Skipping..."
     fi
@@ -48,3 +52,23 @@ done
 wait
 
 echo "All RBP processing tasks are complete."
+
+# Combine all correlation results into a single file
+echo "INFO:root:Computed correlations:" > $COMBINED_FILE
+
+for RBP_NUM in {1..38}; do
+    LOG_FILE="${OUTPUT_DIR}/output_RBP${RBP_NUM}.log"
+    if [ -f "$LOG_FILE" ]; then
+        # Extract numeric correlation values and append to the combined file
+        grep -Eo '[+-]?[0-9]+\.[0-9]+' "$LOG_FILE" >> $COMBINED_FILE
+    fi
+done
+
+# Calculate the average correlation and append to the combined file
+average=$(grep -Eo '[+-]?[0-9]+\.[0-9]+' $COMBINED_FILE | awk '{sum+=$1} END {print sum/NR}')
+echo "INFO:root:avg correlation: $average" >> $COMBINED_FILE
+
+# Remove individual log files
+rm -f ${OUTPUT_DIR}/output_RBP*.log
+
+echo "Combined results are saved in $COMBINED_FILE and individual log files have been removed."
