@@ -3,6 +3,7 @@ import numpy as np
 from scipy.stats import pearsonr
 from joblib import Parallel, delayed
 from datasets.ngram_rna_sequence_dataset import NgramRNASequenceDataset
+from utils import transform_into_valid_intensity_range
 
 
 class SelectedNGramProjectionModel:
@@ -63,8 +64,8 @@ class SelectedNGramProjectionModel:
 
         htr_proj_vector = train_dataset.features.sum(axis=0).A.squeeze()
         rna_scores = test_dataset.features.dot(htr_proj_vector)
-
-        return rna_scores
+        scaled_rna_scores = transform_into_valid_intensity_range(rna_scores)
+        return scaled_rna_scores
 
     def compute_correlation(self, rna_score, binding_intensities_path):
         # Load ground truth binding intensities

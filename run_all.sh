@@ -6,6 +6,7 @@ HTR_SELEX_DIR="data/htr-selex"
 PYTHON_SCRIPT="main.py"
 OUTPUT_DIR="output"
 COMBINED_FILE="combined_correlations.txt"
+MAX_PROCESSES=10
 
 export PYTHONUNBUFFERED=1
 
@@ -43,8 +44,16 @@ process_rbp() {
     fi
 }
 
+# Function to wait for jobs to finish if the maximum number of processes are running
+wait_for_processes() {
+    while [ $(jobs -r | wc -l) -ge $MAX_PROCESSES ]; do
+        sleep 1
+    done
+}
+
 # Loop through all RBP numbers and run each in parallel
 for RBP_NUM in {1..38}; do
+    wait_for_processes
     process_rbp $RBP_NUM
 done
 

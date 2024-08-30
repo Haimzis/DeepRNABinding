@@ -37,7 +37,7 @@ class CNNAttention(BaseModel):
         """
         x = x.permute(0, 2, 1)  # Shape: (batch_size, 4, seq_length)
         conv_output = F.relu(self.batch_norm(self.conv(x))) 
-        conv_output = conv_output.permute(0, 2, 1)  # Shape: (batch_size, new_seq_length, num_filters)
+        conv_output = conv_output.permute(0, 2, 1)  # Shape: (batch_size, new_seq_length, num_filters) h
 
         attention_scores = torch.tanh(self.attention(conv_output))  # Shape: (batch_size, new_seq_length, attention_dim)
         attention_weights = F.softmax(self.context_vector(attention_scores), dim=1)  # Shape: (batch_size, new_seq_length, 1)
