@@ -6,9 +6,9 @@ from models.selected_ngram_projection import SelectedNGramProjectionModel
 def parse_args():
     parser = argparse.ArgumentParser(description='Compute correlations for RNA binding proteins using clustering.')
     parser.add_argument('--rbp_num', type=int, default=38, help='The number of the RNA binding proteins to process.')
-    parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
-    parser.add_argument('--intensities_dir', type=str, default='data/RNAcompete_intensities', help='Directory containing the intensity levels.')
-    parser.add_argument('--htr_selex_dir', type=str, default='data/htr-selex', help='Directory containing the HTR-SELEX documents.')
+    parser.add_argument('--sequences_file', type=str, default='RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
+    parser.add_argument('--intensities_dir', type=str, default='RNAcompete_intensities', help='Directory containing the intensity levels.')
+    parser.add_argument('--htr_selex_dir', type=str, default='htr-selex', help='Directory containing the HTR-SELEX documents.')
 
     return parser.parse_args()
 

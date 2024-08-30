@@ -13,9 +13,9 @@ from rna_sequence_dataset import RNASequenceDataset # load desired dataset
 
 def main():
     parser = argparse.ArgumentParser(description="Test RNASequenceDataset.")
-    parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
-    parser.add_argument('--intensities_dir', type=str, default='data/RNAcompete_intensities', help='Directory containing the intensity levels.')
-    parser.add_argument('--htr_selex_dir', type=str, default='data/htr-selex', help='Directory containing the HTR-SELEX documents.')
+    parser.add_argument('--sequences_file', type=str, default='RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
+    parser.add_argument('--intensities_dir', type=str, default='RNAcompete_intensities', help='Directory containing the intensity levels.')
+    parser.add_argument('--htr_selex_dir', type=str, default='htr-selex', help='Directory containing the HTR-SELEX documents.')
     parser.add_argument('--rbp_num', type=int, default=28, help='RBP index number.')
     parser.add_argument('--trim', type=bool, default=False, help='Trim the data for faster debugging.')
     parser.add_argument('--train', type=bool, default=True, help='Load HTR-SELEX or RNACompete sequences.')

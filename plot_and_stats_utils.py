@@ -1,34 +1,10 @@
-import pandas as pd
+from turtle import pd
 from matplotlib import pyplot as plt
 import numpy as np
-import torch
-import os
-import logging as log
-import seaborn as sns
 from datasets.rna_sequence_dataset import RNASequenceDataset
+import seaborn as sns
+import os
 
-# TODO: dont put here stuff for training, just utillities. 
-
-def save_predictions(predictions, predict_output_dir):
-    """
-    Save the predictions to a file.
-    Args:
-        predictions: A tensor containing the predictions.
-        predict_output_dir: The directory to save the predictions to.
-    """
-    if not os.path.exists(predict_output_dir):
-        os.makedirs(predict_output_dir)
-    with open(os.path.join(predict_output_dir, 'predictions.txt'), 'w') as f:
-        for pred in predictions:
-            f.write(f'{pred}\n')
-
-def get_device():
-    """
-    Get the device (GPU or CPU) for computation.
-    """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    log.info(f"Using device: {device}")
-    return device
 
 def generate_rbp_intensity_correlation_heatmap(sequences_file, intensities_dir, htr_selex_dir, num_rbps=38, output_file='rbp_intensity_correlations_heatmap.png'):
     """
@@ -69,13 +45,6 @@ def generate_rbp_intensity_correlation_heatmap(sequences_file, intensities_dir, 
 
     print(f"Heatmap saved as '{output_file}'")
 
-def get_person_correlation(predictions, intensities):
-    """Calculates the Pearson correlation between the predictions and intensities."""
-    return np.corrcoef(predictions, intensities)[0, 1]
-
-intensities_dir='data/RNAcompete_intensities'
-predict_output_dir='outputs/predictions/ImprovedDeepSELEX'
-
 def get_min_max_intensities(intensities_dir):
     intensities = []
     max_arr = []
@@ -86,11 +55,12 @@ def get_min_max_intensities(intensities_dir):
             intensities.append(pd.read_csv(intensities_file, header=None).values.flatten())
             max_arr.append(np.max(intensities[-1]))
             min_arr.append(np.min(intensities[-1]))
-    with open('data/min_max_intensities.txt', 'w') as f:
+    with open('min_max_intensities.txt', 'w') as f:
         for i in range(38):
             f.write(f'RBP{i+1}: Min={min_arr[i]}, Max={max_arr[i]}\n')
         f.write(f'Min: {min(min_arr)}\n')
         f.write(f'Max: {max(max_arr)}\n')
+
 
 def get_intensity_bins(intensities_dir):
     bins = []
@@ -109,7 +79,7 @@ def get_intensity_bins(intensities_dir):
                 class_info.append((class_range, count))
             bins.append(hist)
             ranges.append(class_info)
-    with open('data/intensity_bins.txt', 'w') as f:
+    with open('intensity_bins.txt', 'w') as f:
         for i in range(38):
             f.write(f'RBP{i+1}: {bins[i]}\n')
             # Calculate the percentage for each element in bins[i]
@@ -119,64 +89,3 @@ def get_intensity_bins(intensities_dir):
             # Write the formatted string to the file
             f.write(f'RBP{i + 1}: {percentages_str}\n')
             f.write(f'Ranges: {ranges[i]}\n')
-
-def print_args(args):
-    """
-    Prints all the arguments as a dictionary.
-
-    Args:
-        args: Namespace object containing configuration and hyperparameters.
-    """
-    args_dict = vars(args)
-    print("Arguments used for this run:")
-    print(args_dict)
-
-
-def transform_into_valid_intensity_range(rna_score, rbp_known_intensity_range=(0.0, 8.401)):
-    """
-    Scales predicted RNA scores into the known range of RBP intensities.
-
-    :param rna_score: A NumPy array of floats representing the RNA scores to be transformed.
-    :param rbp_known_intensity_range: A tuple (min_rbp, max_rbp) representing the known range of RBP intensities.
-    :return: Scaled RNA score(s) within the known RBP intensity range as a NumPy array.
-    """
-    min_rbp, max_rbp = rbp_known_intensity_range
-    
-    # Calculate the min and max of the RNA scores
-    min_score = np.min(rna_score)
-    max_score = np.max(rna_score)
-    
-    if min_score == max_score:
-        # If all values are the same, map everything to the midpoint of the range
-        return np.full_like(rna_score, (min_rbp + max_rbp) / 2.0)
-    
-    # Apply min-max scaling
-    scaled_scores = ((rna_score - min_score) / (max_score - min_score)) * (max_rbp - min_rbp) + min_rbp
-    
-    return scaled_scores
-
-
-def find_min_max_values_in_rbp_intensity_files(directory='data/RNAcompete_intensities'):
-    min_value = float('inf')
-    max_value = float('-inf')
-    
-    for i in range(1, 39):
-        file_path = os.path.join(directory, f"RBP{i}.txt")
-        
-        if os.path.isfile(file_path):
-            with open(file_path, 'r') as file:
-                for line in file:
-                    try:
-                        value = float(line.strip())
-                        min_value = min(min_value, value)
-                        max_value = max(max_value, value)
-                    except ValueError:
-                        continue
-        else:
-            print(f"File not found: {file_path}")
-    
-    return min_value, max_value
-
-
-if __name__ == '__main__':
-    print(find_min_max_values_in_rbp_intensity_files())

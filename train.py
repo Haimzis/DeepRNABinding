@@ -23,13 +23,13 @@ from models.deepselex import DeepSELEX
 
 # Argument parsing
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default='LSTMSELEX', help='Model to use: CNNAttention, DeepSELEX, LSTMSELEX, NGramDNN')
+parser.add_argument('--model', type=str, default='DeepSELEX', help='Model to use: CNNAttention, DeepSELEX, LSTMSELEX, NGramDNN')
+parser.add_argument('sequences_file', type=str, default='RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
+parser.add_argument('htr_selex_files', type=str, nargs='+', default=None, help='Sequence of RBP\'s files')
 parser.add_argument('--rbp_num', type=int, default=None, help='The number of the RNA binding protein to predict.')
-parser.add_argument('--htr_selex_files', type='+', default=None, help='Sequence of RBP\'s files')
 parser.add_argument('--predict', type=bool, default=True, help='Predict the intensity levels.')
-parser.add_argument('--sequences_file', type=str, default='data/RNAcompete_sequences_rc.txt', help='File containing the RNA sequences.')
-parser.add_argument('--intensities_dir', type=str, default='data/RNAcompete_intensities', help='Directory containing the intensity levels.')
-parser.add_argument('--htr_selex_dir', type=str, default='data/htr-selex', help='Directory containing the HTR-SELEX documents.')
+parser.add_argument('--intensities_dir', type=str, default='RNAcompete_intensities', help='Directory containing the intensity levels.')
+parser.add_argument('--htr_selex_dir', type=str, default='htr-selex', help='Directory containing the HTR-SELEX documents.')
 parser.add_argument('--predict_output_dir', type=str, default='outputs/predictions/Deep_SELEX', help='Directory to save the predictions.')
 parser.add_argument('--save_model_file', type=str, default='outputs/models/Deep_SELEX', help='Directory to save the model.')
 parser.add_argument('--load_model_file', type=str, default='outputs/models/Deep_SELEX/best_model.ckpt', help='File to load the model.')
@@ -53,29 +53,29 @@ def select_model_and_dataset(args):
     # Select training and test dataset
     if args.model in ['NGramDNN']:
         train_dataset = NgramRNASequenceDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num,
-            args.htr_selex_files, trim=args.trim, train=True, negative_examples=args.negative_examples, n=(7, 9), binary_embedding=False, top_m=1024
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.htr_selex_files, 
+            args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, n=(7, 9), binary_embedding=False, top_m=1024
         )
         test_dataset = NgramRNASequenceDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.rbp_num,
-            args.htr_selex_files, trim=args.trim, train=False, negative_examples=args.negative_examples, vectorizer=train_dataset.vectorizer, selector=train_dataset.selector
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.htr_selex_files, 
+            args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, vectorizer=train_dataset.vectorizer, selector=train_dataset.selector
         )
     elif args.model in ['DeepSELEX']:
         train_dataset = RNASequenceDatasetDeepSelex(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.htr_selex_files, 
             args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples, k=args.k
         )
         test_dataset = RNASequenceDatasetDeepSelex(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.htr_selex_files, 
             args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples, k=args.k
         )
     elif args.model in ['CNNAttention', 'LSTMSELEX']:
         train_dataset = RNASequenceDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.htr_selex_files, 
             args.rbp_num, trim=args.trim, train=True, negative_examples=args.negative_examples
         )
         test_dataset = RNASequenceDataset(
-            args.sequences_file, args.intensities_dir, args.htr_selex_dir,
+            args.sequences_file, args.intensities_dir, args.htr_selex_dir, args.htr_selex_files, 
             args.rbp_num, trim=args.trim, train=False, negative_examples=args.negative_examples
         )
     else:
